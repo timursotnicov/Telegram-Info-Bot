@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -200,7 +202,7 @@ async def cmd_search(message: types.Message, db=None):
         # Show what AI understood
         info_parts = []
         if parsed["keywords"]:
-            info_parts.append(f"Ключевые слова: {', '.join(parsed['keywords'])}")
+            info_parts.append(f"Ключевые слова: {html.escape(', '.join(parsed['keywords']))}")
         if parsed.get("date_from"):
             info_parts.append(f"С: {parsed['date_from']}")
         if parsed.get("date_to"):
@@ -277,10 +279,10 @@ async def cmd_ask(message: types.Message, db=None):
     answer = await synthesize_answer(question, items)
 
     if answer:
-        text = f"💡 <b>Ответ:</b>\n{answer}\n\n"
+        text = f"💡 <b>Ответ:</b>\n{html.escape(answer)}\n\n"
         text += f"📚 <b>Источники ({len(items)}):</b>\n"
         for item in items[:5]:
-            summary = item.get("ai_summary") or item["content_text"][:60]
+            summary = html.escape(item.get("ai_summary") or item["content_text"][:60])
             text += f"  #{item['id']} {summary}\n"
     else:
         # AI failed — show search results instead
