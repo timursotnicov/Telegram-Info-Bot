@@ -1,0 +1,95 @@
+"""Scheduler for periodic tasks (digests, cleanup)."""
+from __future__ import annotations
+
+import logging
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+
+from aiogram import Bot
+import aiosqlite
+
+from savebot.db import queries
+from savebot.db.state_store import cleanup_expired
+from savebot.services.digest import generate_weekly_digest
+
+logger = logging.getLogger(__name__)
+
+_scheduler: AsyncIOScheduler | None = None
+
+
+async def _send_digests(bot: Bot, db_path: str):
+    """Send weekly digests to users whose chosen day is today."""
+    import datetime
+    today_weekday = datetime.datetime.now().weekday()  # 0=Mon, 6=Sun
+
+    db = await aiosqlite.connect(db_path)
+    db.row_factory = aiosqlite.Row
+    try:
+        users = await queries.get_all_users_with_digest(db)
+        for user_pref in users:
+            # Only send if today matches user's chosen digest day
+            user_day = user_pref.get("digest_day", 1)  # default Monday=1
+            if user_day != today_weekday:
+                continue
+
+            user_id = user_pref["user_id"]
+            try:
+                digest = await generate_weekly_digest(db, user_id)
+                if digest:
+                    await bot.send_message(user_id, digest, parse_mode="HTML")
+                    week_items = await queries.get_items_this_week(db, user_id, limit=50)
+                    item_ids = [it["id"] for it in week_items]
+                    await queries.log_digest(db, user_id, item_ids)
+                    logger.info("Digest sent to user %s", user_id)
+            except Exception as e:
+                logger.error("Failed to send digest to user %s: %s", user_id, e)
+    finally:
+        await db.close()
+
+
+async def _cleanup_states(db_path: str):
+    """Clean up expired pending states."""
+    db = await aiosqlite.connect(db_path)
+    db.row_factory = aiosqlite.Row
+    try:
+        await cleanup_expired(db, max_age_minutes=60)
+    finally:
+        await db.close()
+
+
+def start_scheduler(bot: Bot, db_path: str):
+    """Start the async scheduler with digest and cleanup jobs."""
+    global _scheduler
+    _scheduler = AsyncIOScheduler()
+
+    # Daily check at 10:00 — sends digest only to users whose chosen day is today
+    _scheduler.add_job(
+        _send_digests,
+        CronTrigger(hour=10, minute=0),
+        args=[bot, db_path],
+        id="daily_digest_check",
+        replace_existing=True,
+    )
+
+    # Cleanup expired pending states — every hour
+    _scheduler.add_job(
+        _cleanup_states,
+        IntervalTrigger(hours=1),
+        args=[db_path],
+        id="cleanup_states",
+        replace_existing=True,
+    )
+
+    _scheduler.start()
+    logger.info("Scheduler started with %d jobs", len(_scheduler.get_jobs()))
+
+
+def stop_scheduler():
+    """Stop the scheduler gracefully."""
+    global _scheduler
+    if _scheduler:
+        _scheduler.shutdown(wait=False)
+        _scheduler = None
+        logger.info("Scheduler stopped")

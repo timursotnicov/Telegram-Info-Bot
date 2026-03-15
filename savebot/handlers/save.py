@@ -1,55 +1,44 @@
-"""Save flow handler — receives content, classifies with AI, shows inline buttons."""
-
+"""Save flow handler — auto-save with AI categorization."""
 from __future__ import annotations
-
-import json
 import logging
 
 from aiogram import F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from savebot.db import queries
+from savebot.db.state_store import get_state, set_state, delete_state
 from savebot.services.ai_classifier import classify_content
+from savebot.services.connections import find_related_items
 from savebot.services.link_preview import extract_url, fetch_link_metadata
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-# Temporary storage for pending saves: {user_id}_{message_id} -> data
-_pending: dict[str, dict] = {}
+
+def _post_save_keyboard(item_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔄 Изменить", callback_data=f"autosave_change:{item_id}"),
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"autosave_delete:{item_id}"),
+    ]])
 
 
-def _format_suggestion(ai: dict) -> str:
-    tags_str = " ".join(f"#{t}" for t in ai["tags"])
-    text = (
-        f"🔖 <b>AI предлагает:</b>\n"
-        f"Категория: {ai['emoji']} {ai['category']}\n"
-        f"Теги: {tags_str}\n"
-    )
-    if ai.get("summary"):
-        text += f"<i>Саммари: {ai['summary']}</i>\n"
-    return text
+def _confirm_keyboard(pending_key: str) -> InlineKeyboardMarkup:
+    """For manual save mode (auto_save=False)."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Сохранить", callback_data=f"save_confirm:{pending_key}"),
+        InlineKeyboardButton(text="🔖 Другая категория", callback_data=f"save_change_cat:{pending_key}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data=f"save_cancel:{pending_key}"),
+    ]])
 
 
-def _save_keyboard(pending_key: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Сохранить", callback_data=f"save_confirm:{pending_key}"),
-            InlineKeyboardButton(text="🔖 Другая категория", callback_data=f"save_change_cat:{pending_key}"),
-            InlineKeyboardButton(text="❌ Отмена", callback_data=f"save_cancel:{pending_key}"),
-        ]
-    ])
-
-
-async def _process_content(message: types.Message, db):
-    """Common logic for processing any incoming content."""
+async def _detect_content(message: types.Message):
+    """Detect content type and extract text/metadata."""
     content_type = "text"
     content_text = ""
     url = None
     file_id = None
     source = None
 
-    # Forwarded message
     if message.forward_origin:
         content_type = "forward"
         content_text = message.text or message.caption or ""
@@ -59,8 +48,6 @@ async def _process_content(message: types.Message, db):
             source = message.forward_origin.chat.title or message.forward_origin.chat.full_name
         elif hasattr(message.forward_origin, "sender_user_name"):
             source = message.forward_origin.sender_user_name
-
-    # File / photo / document
     elif message.document:
         content_type = "file"
         content_text = message.caption or message.document.file_name or "document"
@@ -81,8 +68,6 @@ async def _process_content(message: types.Message, db):
         content_type = "file"
         content_text = message.caption or "voice message"
         file_id = message.voice.file_id
-
-    # Text with URL
     elif message.text:
         detected_url = extract_url(message.text)
         if detected_url:
@@ -103,8 +88,16 @@ async def _process_content(message: types.Message, db):
     if not content_text:
         content_text = message.text or message.caption or ""
 
+    return content_type, content_text, url, file_id, source
+
+
+async def _process_content(message: types.Message, db):
+    """Process incoming content — auto-save or manual mode."""
+    user_id = message.from_user.id
+    content_type, content_text, url, file_id, source = await _detect_content(message)
+
     # Check for duplicates
-    dup = await queries.find_duplicate(db, content_text, url)
+    dup = await queries.find_duplicate(db, user_id, content_text, url)
     if dup:
         await message.reply(
             f"⚠️ Похоже, это уже сохранено (ID: {dup['id']}).\n"
@@ -114,35 +107,77 @@ async def _process_content(message: types.Message, db):
         return
 
     # Get existing categories and tags for AI
-    categories = await queries.get_all_categories(db)
-    tags = await queries.get_all_tags(db)
+    categories = await queries.get_all_categories(db, user_id)
+    tags = await queries.get_all_tags(db, user_id)
     tag_names = [t["tag"] for t in tags]
 
     # Classify with AI
     ai_result = await classify_content(content_text, categories, tag_names)
-
     if not ai_result:
-        ai_result = {
-            "category": "Inbox",
-            "emoji": "📥",
-            "tags": [],
-            "summary": "",
-        }
+        ai_result = {"category": "Inbox", "emoji": "📥", "tags": [], "summary": ""}
 
-    # Store pending save
-    pending_key = f"{message.from_user.id}_{message.message_id}"
-    _pending[pending_key] = {
-        "content_type": content_type,
-        "content_text": content_text,
-        "url": url,
-        "file_id": file_id,
-        "source": source,
-        "ai_result": ai_result,
-        "tg_message_id": message.message_id,
-    }
+    # Check user preferences
+    prefs = await queries.get_user_preferences(db, user_id)
 
-    text = _format_suggestion(ai_result)
-    await message.reply(text, reply_markup=_save_keyboard(pending_key), parse_mode="HTML")
+    if prefs.get("auto_save", 1):
+        # AUTO-SAVE: save immediately
+        cat = await queries.get_or_create_category(db, user_id, ai_result["category"], ai_result.get("emoji", "📁"))
+        item_id = await queries.save_item(
+            db, user_id,
+            category_id=cat["id"],
+            content_type=content_type,
+            content_text=content_text,
+            tags=ai_result["tags"],
+            url=url, file_id=file_id, source=source,
+            ai_summary=ai_result.get("summary"),
+            tg_message_id=message.message_id,
+        )
+
+        tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
+        text = f"✅ Сохранено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>"
+        if tags_str:
+            text += f" / {tags_str}"
+        if ai_result.get("summary"):
+            text += f"\n<i>{ai_result['summary']}</i>"
+
+        # Find related items
+        related = await find_related_items(
+            db, item_id, user_id,
+            category_id=cat["id"],
+            tags=ai_result["tags"],
+            source=source,
+        )
+        if related:
+            text += "\n\n🔗 <b>Похожие записи:</b>"
+            for r in related:
+                r_summary = r.get("ai_summary") or r["content_text"][:60]
+                text += f"\n  #{r['id']} {r_summary}"
+
+        await message.reply(text, reply_markup=_post_save_keyboard(item_id), parse_mode="HTML")
+
+    else:
+        # MANUAL SAVE: show confirmation (old flow)
+        pending_key = f"{user_id}_{message.message_id}"
+        await set_state(db, pending_key, user_id, "save", {
+            "content_type": content_type,
+            "content_text": content_text,
+            "url": url,
+            "file_id": file_id,
+            "source": source,
+            "ai_result": ai_result,
+            "tg_message_id": message.message_id,
+        })
+
+        tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
+        text = (
+            f"🔖 <b>AI предлагает:</b>\n"
+            f"Категория: {ai_result['emoji']} {ai_result['category']}\n"
+            f"Теги: {tags_str}\n"
+        )
+        if ai_result.get("summary"):
+            text += f"<i>Саммари: {ai_result['summary']}</i>\n"
+
+        await message.reply(text, reply_markup=_confirm_keyboard(pending_key), parse_mode="HTML")
 
 
 # ── Message handlers ────────────────────────────────────────
@@ -151,67 +186,115 @@ async def _process_content(message: types.Message, db):
 async def handle_text(message: types.Message, db=None):
     await _process_content(message, db)
 
-
 @router.message(F.photo)
 async def handle_photo(message: types.Message, db=None):
     await _process_content(message, db)
-
 
 @router.message(F.document)
 async def handle_document(message: types.Message, db=None):
     await _process_content(message, db)
 
-
 @router.message(F.video)
 async def handle_video(message: types.Message, db=None):
     await _process_content(message, db)
-
 
 @router.message(F.audio)
 async def handle_audio(message: types.Message, db=None):
     await _process_content(message, db)
 
-
 @router.message(F.voice)
 async def handle_voice(message: types.Message, db=None):
     await _process_content(message, db)
-
 
 @router.message(F.forward_origin)
 async def handle_forward(message: types.Message, db=None):
     await _process_content(message, db)
 
 
-# ── Callback handlers ──────────────────────────────────────
+# ── Auto-save callbacks (work with item_id) ───────────────
+
+@router.callback_query(F.data.startswith("autosave_change:"))
+async def on_autosave_change(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
+
+    buttons = []
+    row = []
+    for cat in categories:
+        row.append(InlineKeyboardButton(
+            text=f"{cat.get('emoji', '📁')} {cat['name']}",
+            callback_data=f"autosave_pick:{item_id}:{cat['id']}",
+        ))
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+
+    await callback.message.edit_reply_markup(
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("autosave_pick:"))
+async def on_autosave_pick(callback: types.CallbackQuery, db=None):
+    parts = callback.data.split(":")
+    item_id = int(parts[1])
+    cat_id = int(parts[2])
+    user_id = callback.from_user.id
+
+    await queries.update_item_category(db, user_id, item_id, cat_id)
+    cats = await queries.get_all_categories(db, user_id)
+    cat = next((c for c in cats if c["id"] == cat_id), {"name": "Unknown", "emoji": "📁"})
+
+    await callback.message.edit_text(
+        f"✅ Перемещено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>",
+        parse_mode="HTML",
+        reply_markup=_post_save_keyboard(item_id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("autosave_delete:"))
+async def on_autosave_delete(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    await queries.delete_item(db, user_id, item_id)
+    await callback.message.edit_text("🗑 Запись удалена.")
+    await callback.answer()
+
+
+# ── Manual save callbacks (work with pending_key via state_store) ──
 
 @router.callback_query(F.data.startswith("save_confirm:"))
 async def on_save_confirm(callback: types.CallbackQuery, db=None):
     pending_key = callback.data.split(":", 1)[1]
-    data = _pending.pop(pending_key, None)
+    data = await get_state(db, pending_key)
     if not data:
         await callback.answer("Сессия истекла. Отправьте контент заново.")
         return
+    await delete_state(db, pending_key)
 
+    user_id = callback.from_user.id
     ai = data["ai_result"]
-    cat = await queries.get_or_create_category(db, ai["category"], ai.get("emoji", "📁"))
+    cat = await queries.get_or_create_category(db, user_id, ai["category"], ai.get("emoji", "📁"))
 
     item_id = await queries.save_item(
-        db,
+        db, user_id,
         category_id=cat["id"],
         content_type=data["content_type"],
         content_text=data["content_text"],
         tags=ai["tags"],
-        url=data.get("url"),
-        file_id=data.get("file_id"),
-        source=data.get("source"),
-        ai_summary=ai.get("summary"),
+        url=data.get("url"), file_id=data.get("file_id"),
+        source=data.get("source"), ai_summary=ai.get("summary"),
         tg_message_id=data.get("tg_message_id"),
     )
 
     tags_str = " ".join(f"#{t}" for t in ai["tags"])
     await callback.message.edit_text(
-        f"✅ Сохранено в {cat.get('emoji', '📁')} {cat['name']} / {tags_str}\n"
-        f"ID: {item_id}",
+        f"✅ Сохранено в {cat.get('emoji', '📁')} {cat['name']} / {tags_str}\nID: {item_id}",
         parse_mode="HTML",
     )
     await callback.answer()
@@ -220,12 +303,13 @@ async def on_save_confirm(callback: types.CallbackQuery, db=None):
 @router.callback_query(F.data.startswith("save_change_cat:"))
 async def on_change_category(callback: types.CallbackQuery, db=None):
     pending_key = callback.data.split(":", 1)[1]
-    data = _pending.get(pending_key)
+    data = await get_state(db, pending_key)
     if not data:
         await callback.answer("Сессия истекла.")
         return
 
-    categories = await queries.get_all_categories(db)
+    user_id = callback.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
     buttons = []
     row = []
     for cat in categories:
@@ -238,14 +322,9 @@ async def on_change_category(callback: types.CallbackQuery, db=None):
             row = []
     if row:
         buttons.append(row)
-    buttons.append([InlineKeyboardButton(
-        text="➕ Создать новую",
-        callback_data=f"save_new_cat:{pending_key}",
-    )])
+    buttons.append([InlineKeyboardButton(text="➕ Создать новую", callback_data=f"save_new_cat:{pending_key}")])
 
-    await callback.message.edit_reply_markup(
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
-    )
+    await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
     await callback.answer()
 
 
@@ -255,33 +334,31 @@ async def on_pick_category(callback: types.CallbackQuery, db=None):
     pending_key = parts[1]
     cat_id = int(parts[2])
 
-    data = _pending.pop(pending_key, None)
+    data = await get_state(db, pending_key)
     if not data:
         await callback.answer("Сессия истекла.")
         return
+    await delete_state(db, pending_key)
 
+    user_id = callback.from_user.id
     ai = data["ai_result"]
     item_id = await queries.save_item(
-        db,
+        db, user_id,
         category_id=cat_id,
         content_type=data["content_type"],
         content_text=data["content_text"],
         tags=ai["tags"],
-        url=data.get("url"),
-        file_id=data.get("file_id"),
-        source=data.get("source"),
-        ai_summary=ai.get("summary"),
+        url=data.get("url"), file_id=data.get("file_id"),
+        source=data.get("source"), ai_summary=ai.get("summary"),
         tg_message_id=data.get("tg_message_id"),
     )
 
-    # Fetch category info for display
-    cats = await queries.get_all_categories(db)
+    cats = await queries.get_all_categories(db, user_id)
     cat = next((c for c in cats if c["id"] == cat_id), {"name": "Unknown", "emoji": "📁"})
     tags_str = " ".join(f"#{t}" for t in ai["tags"])
 
     await callback.message.edit_text(
-        f"✅ Сохранено в {cat.get('emoji', '📁')} {cat['name']} / {tags_str}\n"
-        f"ID: {item_id}",
+        f"✅ Сохранено в {cat.get('emoji', '📁')} {cat['name']} / {tags_str}\nID: {item_id}",
         parse_mode="HTML",
     )
     await callback.answer()
@@ -290,23 +367,22 @@ async def on_pick_category(callback: types.CallbackQuery, db=None):
 @router.callback_query(F.data.startswith("save_new_cat:"))
 async def on_new_category(callback: types.CallbackQuery, db=None):
     pending_key = callback.data.split(":", 1)[1]
-    if pending_key not in _pending:
+    data = await get_state(db, pending_key)
+    if not data:
         await callback.answer("Сессия истекла.")
         return
 
-    await callback.message.edit_text(
-        "Введите название новой категории (или отправьте /cancel):",
-        parse_mode="HTML",
-    )
-    # Store that we're waiting for new category name
-    _pending[pending_key]["awaiting_new_cat"] = True
-    _pending[f"awaiting_{callback.from_user.id}"] = pending_key
+    await callback.message.edit_text("Введите название новой категории (или отправьте /cancel):", parse_mode="HTML")
+    # Mark that we're waiting for new category name
+    data["awaiting_new_cat"] = True
+    await set_state(db, pending_key, callback.from_user.id, "save", data)
+    await set_state(db, f"awaiting_{callback.from_user.id}", callback.from_user.id, "awaiting_cat", {"pending_key": pending_key})
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("save_cancel:"))
 async def on_save_cancel(callback: types.CallbackQuery, db=None):
     pending_key = callback.data.split(":", 1)[1]
-    _pending.pop(pending_key, None)
+    await delete_state(db, pending_key)
     await callback.message.edit_text("❌ Отменено.")
     await callback.answer()

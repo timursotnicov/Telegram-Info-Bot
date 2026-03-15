@@ -9,6 +9,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from savebot.db import queries
+from savebot.db.state_store import set_state
 
 router = Router()
 
@@ -30,7 +31,8 @@ async def cmd_start(message: types.Message, **kwargs):
         "/edit &lt;id&gt; — редактировать запись\n"
         "/delete &lt;id&gt; — удалить запись\n"
         "/stats — статистика\n"
-        "/export — экспорт в JSON",
+        "/export — экспорт в JSON\n"
+        "/settings — настройки",
         parse_mode="HTML",
     )
 
@@ -44,7 +46,8 @@ async def cmd_help(message: types.Message, **kwargs):
 
 @router.message(Command("stats"))
 async def cmd_stats(message: types.Message, db=None, **kwargs):
-    stats = await queries.get_stats(db)
+    user_id = message.from_user.id
+    stats = await queries.get_stats(db, user_id)
     await message.reply(
         f"📊 <b>Статистика:</b>\n\n"
         f"📝 Записей: {stats['items']}\n"
@@ -58,7 +61,8 @@ async def cmd_stats(message: types.Message, db=None, **kwargs):
 
 @router.message(Command("categories"))
 async def cmd_categories(message: types.Message, db=None, **kwargs):
-    categories = await queries.get_all_categories(db)
+    user_id = message.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
     if not categories:
         await message.reply("Категорий пока нет.")
         return
@@ -91,7 +95,8 @@ async def cmd_categories(message: types.Message, db=None, **kwargs):
 @router.callback_query(F.data.startswith("cat_delete:"))
 async def on_cat_delete(callback: types.CallbackQuery, db=None):
     cat_id = int(callback.data.split(":")[1])
-    affected = await queries.delete_category(db, cat_id)
+    user_id = callback.from_user.id
+    affected = await queries.delete_category(db, user_id, cat_id)
     await callback.message.edit_text(
         f"🗑 Категория удалена. {affected} записей перемещены в «без категории».",
         parse_mode="HTML",
@@ -105,9 +110,7 @@ async def on_cat_rename(callback: types.CallbackQuery, db=None):
         "Введите новое название категории:",
         parse_mode="HTML",
     )
-    # We'd need FSM for proper state management, using a simple approach here
-    from savebot.handlers.save import _pending
-    _pending[f"rename_cat_{callback.from_user.id}"] = int(callback.data.split(":")[1])
+    await set_state(db, f"rename_cat_{callback.from_user.id}", callback.from_user.id, "rename_cat", {"cat_id": int(callback.data.split(":")[1])})
     await callback.answer()
 
 
@@ -115,6 +118,7 @@ async def on_cat_rename(callback: types.CallbackQuery, db=None):
 
 @router.message(Command("edit"))
 async def cmd_edit(message: types.Message, db=None, **kwargs):
+    user_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
         await message.reply("Использование: /edit <id>")
@@ -126,7 +130,7 @@ async def cmd_edit(message: types.Message, db=None, **kwargs):
         await message.reply("ID должен быть числом.")
         return
 
-    item = await queries.get_item(db, item_id)
+    item = await queries.get_item(db, user_id, item_id)
     if not item:
         await message.reply(f"Запись #{item_id} не найдена.")
         return
@@ -139,7 +143,7 @@ async def cmd_edit(message: types.Message, db=None, **kwargs):
         f"Текст: {item['content_text'][:200]}\n"
     )
 
-    categories = await queries.get_all_categories(db)
+    categories = await queries.get_all_categories(db, user_id)
     buttons = []
     row = []
     for cat in categories:
@@ -166,8 +170,9 @@ async def on_edit_category(callback: types.CallbackQuery, db=None):
     parts = callback.data.split(":")
     item_id = int(parts[1])
     cat_id = int(parts[2])
+    user_id = callback.from_user.id
 
-    await queries.update_item_category(db, item_id, cat_id)
+    await queries.update_item_category(db, user_id, item_id, cat_id)
     await callback.message.edit_text(
         f"✅ Категория записи #{item_id} обновлена.",
         parse_mode="HTML",
@@ -205,7 +210,8 @@ async def cmd_delete(message: types.Message, db=None, **kwargs):
 @router.callback_query(F.data.startswith("confirm_delete:"))
 async def on_confirm_delete(callback: types.CallbackQuery, db=None):
     item_id = int(callback.data.split(":")[1])
-    deleted = await queries.delete_item(db, item_id)
+    user_id = callback.from_user.id
+    deleted = await queries.delete_item(db, user_id, item_id)
     if deleted:
         await callback.message.edit_text(f"🗑 Запись #{item_id} удалена.")
     else:
@@ -223,7 +229,8 @@ async def on_cancel_delete(callback: types.CallbackQuery, **kwargs):
 
 @router.message(Command("export"))
 async def cmd_export(message: types.Message, db=None, **kwargs):
-    items = await queries.export_all(db)
+    user_id = message.from_user.id
+    items = await queries.export_all(db, user_id)
     if not items:
         await message.reply("Нет данных для экспорта.")
         return

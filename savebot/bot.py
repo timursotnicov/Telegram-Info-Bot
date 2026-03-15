@@ -11,7 +11,9 @@ from aiohttp import web
 
 from savebot.config import config
 from savebot.db.models import init_db
-from savebot.handlers import browse, manage, save
+from savebot.handlers import browse, manage, save, settings
+from savebot.middleware import ErrorMiddleware
+from savebot.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,7 +40,11 @@ async def main():
 
     dp = Dispatcher()
 
-    # Register routers — manage first (commands), then browse, then save (catch-all)
+    # Error-catching middleware (runs first, wraps everything)
+    dp.update.middleware(ErrorMiddleware())
+
+    # Register routers — settings first, then manage (commands), browse, save (catch-all)
+    dp.include_router(settings.router)
     dp.include_router(manage.router)
     dp.include_router(browse.router)
     dp.include_router(save.router)
@@ -48,6 +54,8 @@ async def main():
     async def db_middleware(handler, event, data):
         data["db"] = db
         return await handler(event, data)
+
+    start_scheduler(bot, config.db_path)
 
     if config.use_polling:
         logger.info("Starting bot in polling mode...")
@@ -67,6 +75,7 @@ async def main():
         logger.info("Webhook server started")
         await asyncio.Event().wait()
 
+    stop_scheduler()
     await db.close()
 
 
