@@ -11,7 +11,7 @@ from aiohttp import web
 
 from savebot.config import config
 from savebot.db.models import init_db
-from savebot.handlers import browse, manage, save, settings
+from savebot.handlers import browse, inline, manage, save, settings
 from savebot.middleware import ErrorMiddleware
 from savebot.scheduler import start_scheduler, stop_scheduler
 
@@ -47,6 +47,7 @@ async def main():
     dp.include_router(settings.router)
     dp.include_router(manage.router)
     dp.include_router(browse.router)
+    dp.include_router(inline.router)
     dp.include_router(save.router)
 
     # Inject db into all handlers via middleware
