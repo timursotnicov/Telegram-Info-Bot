@@ -9,7 +9,8 @@ load_dotenv()
 @dataclass
 class Config:
     bot_token: str = os.getenv("BOT_TOKEN", "")
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    ai_model: str = os.getenv("AI_MODEL", "google/gemini-2.0-flash-exp:free")
     db_path: str = os.getenv("DB_PATH", "savebot.db")
     webhook_host: str = os.getenv("WEBHOOK_HOST", "")
     webhook_path: str = os.getenv("WEBHOOK_PATH", "/webhook")

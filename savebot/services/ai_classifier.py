@@ -1,4 +1,4 @@
-"""AI categorization service using Google Gemini Flash API."""
+"""AI categorization service using OpenRouter API."""
 
 from __future__ import annotations
 
@@ -29,14 +29,16 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
 {"category": "CategoryName", "emoji": "📁", "tags": ["tag1", "tag2"], "summary": "Brief summary"}
 """
 
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
 
 async def classify_content(
     content_text: str,
     existing_categories: list[dict],
     existing_tags: list[str],
 ) -> dict | None:
-    """Classify content using Gemini Flash API. Returns dict with category, emoji, tags, summary."""
-    if not config.gemini_api_key:
+    """Classify content using OpenRouter API."""
+    if not config.openrouter_api_key:
         return None
 
     categories_str = ", ".join(
@@ -51,31 +53,35 @@ async def classify_content(
         f"Frequently used tags: {tags_str}"
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={config.gemini_api_key}"
+    headers = {
+        "Authorization": f"Bearer {config.openrouter_api_key}",
+        "Content-Type": "application/json",
+    }
 
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": f"{SYSTEM_PROMPT}\n\n{user_prompt}"}
-                ]
-            }
+        "model": config.ai_model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
         ],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 300,
-        },
+        "temperature": 0.3,
+        "max_tokens": 300,
     }
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.post(
+                OPENROUTER_URL,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
                 if resp.status != 200:
-                    logger.error("Gemini API error: %s %s", resp.status, await resp.text())
+                    logger.error("OpenRouter API error: %s %s", resp.status, await resp.text())
                     return None
                 data = await resp.json()
 
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        text = data["choices"][0]["message"]["content"]
         # Strip markdown code blocks if present
         text = text.strip()
         if text.startswith("```"):

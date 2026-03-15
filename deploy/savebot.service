@@ -1,0 +1,15 @@
+[Unit]
+Description=SaveBot Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/savebot
+ExecStart=/opt/savebot/venv/bin/python -m savebot.bot
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
