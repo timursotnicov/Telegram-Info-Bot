@@ -38,6 +38,8 @@ async def cmd_start(message: types.Message, **kwargs):
         "/pinned — закреплённые записи\n"
         "/readlist — список чтения\n"
         "/markread &lt;id&gt; — отметить прочитанным\n"
+        "/map — карта знаний\n"
+        "/forgotten — забытые записи\n"
         "/settings — настройки",
         parse_mode="HTML",
     )
