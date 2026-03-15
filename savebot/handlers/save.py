@@ -10,6 +10,7 @@ from savebot.db.state_store import get_state, set_state, delete_state
 from savebot.services.ai_classifier import classify_content
 from savebot.services.connections import find_related_items
 from savebot.services.link_preview import extract_url, fetch_link_metadata
+from savebot.services.ocr import extract_text_from_image
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -54,8 +55,15 @@ async def _detect_content(message: types.Message):
         file_id = message.document.file_id
     elif message.photo:
         content_type = "file"
-        content_text = message.caption or "photo"
         file_id = message.photo[-1].file_id
+        # OCR: extract text from image via Gemini Flash vision
+        ocr_text = await extract_text_from_image(message.bot, file_id)
+        if ocr_text:
+            content_text = ocr_text
+            if message.caption:
+                content_text = f"{message.caption}\n\n[OCR]: {ocr_text}"
+        else:
+            content_text = message.caption or "photo"
     elif message.video:
         content_type = "file"
         content_text = message.caption or "video"
