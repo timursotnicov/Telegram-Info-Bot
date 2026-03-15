@@ -6,6 +6,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
@@ -20,6 +21,22 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def set_bot_commands(bot: Bot):
+    commands = [
+        BotCommand(command="browse", description="Просмотр по категориям"),
+        BotCommand(command="search", description="Поиск"),
+        BotCommand(command="ask", description="Спросить базу знаний"),
+        BotCommand(command="recent", description="Последние записи"),
+        BotCommand(command="pinned", description="Закреплённые"),
+        BotCommand(command="readlist", description="Список чтения"),
+        BotCommand(command="map", description="Карта знаний"),
+        BotCommand(command="settings", description="Настройки"),
+        BotCommand(command="help", description="Помощь"),
+    ]
+    await bot.set_my_commands(commands)
+    logger.info("Bot commands menu set (%d commands)", len(commands))
 
 
 async def on_startup(bot: Bot, db):
@@ -57,6 +74,7 @@ async def main():
         return await handler(event, data)
 
     start_scheduler(bot, config.db_path)
+    await set_bot_commands(bot)
 
     if config.use_polling:
         logger.info("Starting bot in polling mode...")
