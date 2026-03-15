@@ -393,3 +393,47 @@ async def cmd_markread(message: types.Message, db=None):
         await message.reply(f"✅ Запись #{item_id} отмечена как прочитанная.")
     else:
         await message.reply(f"Запись #{item_id} не найдена.")
+
+
+# ── /map ───────────────────────────────────────────────────
+
+@router.message(Command("map"))
+async def cmd_map(message: types.Message, db=None):
+    user_id = message.from_user.id
+    categories = await queries.get_category_tag_map(db, user_id)
+    stats = await queries.get_stats(db, user_id)
+
+    if not categories:
+        await message.reply("🗺 Карта знаний пуста. Сохрани что-нибудь!")
+        return
+
+    text = "🗺 <b>Карта знаний</b>\n\n"
+    for cat in categories:
+        emoji = cat.get("emoji", "📁")
+        count = cat.get("item_count", 0)
+        tags = " ".join(f"#{t}" for t in cat.get("top_tags", []))
+        text += f"{emoji} <b>{cat['name']}</b> ({count})\n"
+        if tags:
+            text += f"   {tags}\n"
+
+    text += f"\n📊 Всего: {stats['items']} записей, {stats['categories']} категорий, {stats['tags']} тегов"
+
+    await message.reply(text, parse_mode="HTML")
+
+
+# ── /forgotten ─────────────────────────────────────────────
+
+@router.message(Command("forgotten"))
+async def cmd_forgotten(message: types.Message, db=None):
+    user_id = message.from_user.id
+    items = await queries.get_forgotten_items(db, user_id)
+
+    if not items:
+        await message.reply("✨ Нет забытых записей! Все записи свежие или закреплены.")
+        return
+
+    text = "🕸 <b>Забытые записи</b> (старше 30 дней, не закреплены):\n\n"
+    text += "\n\n".join(_format_item(item) for item in items)
+    text += "\n\n💡 Используй /pin <id> чтобы закрепить важные."
+
+    await message.reply(text, parse_mode="HTML")

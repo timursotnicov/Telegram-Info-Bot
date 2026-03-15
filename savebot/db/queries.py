@@ -455,6 +455,36 @@ async def mark_item_read(db: aiosqlite.Connection, user_id: int, item_id: int) -
     return cursor.rowcount > 0
 
 
+# ── Knowledge Map ──────────────────────────────────────────
+
+async def get_category_tag_map(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Get categories with their top tags for the knowledge map."""
+    categories = await get_all_categories(db, user_id)
+    for cat in categories:
+        cursor = await db.execute(
+            """SELECT t.tag, COUNT(*) as cnt
+               FROM item_tags t JOIN items i ON i.id = t.item_id
+               WHERE i.category_id = ? AND i.user_id = ?
+               GROUP BY t.tag ORDER BY cnt DESC LIMIT 5""",
+            (cat["id"], user_id),
+        )
+        cat["top_tags"] = [r["tag"] for r in await cursor.fetchall()]
+    return categories
+
+
+async def get_forgotten_items(db: aiosqlite.Connection, user_id: int, days: int = 30, limit: int = 10) -> list[dict]:
+    """Items older than N days, not pinned, oldest first."""
+    cursor = await db.execute(
+        """SELECT * FROM items
+           WHERE user_id = ? AND is_pinned = 0
+             AND created_at < datetime('now', ?)
+           ORDER BY created_at ASC LIMIT ?""",
+        (user_id, f"-{days} days", limit),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
 # ── Related Items ───────────────────────────────────────────
 
 async def get_items_with_shared_tags(db: aiosqlite.Connection, user_id: int, item_id: int, min_shared: int = 2, limit: int = 3) -> list[dict]:
