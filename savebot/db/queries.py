@@ -455,6 +455,14 @@ async def mark_item_read(db: aiosqlite.Connection, user_id: int, item_id: int) -
     return cursor.rowcount > 0
 
 
+async def mark_all_read(db: aiosqlite.Connection, user_id: int) -> int:
+    cursor = await db.execute(
+        "UPDATE items SET is_read = 1 WHERE user_id = ? AND is_read = 0", (user_id,)
+    )
+    await db.commit()
+    return cursor.rowcount
+
+
 # ── Knowledge Map ──────────────────────────────────────────
 
 async def get_category_tag_map(db: aiosqlite.Connection, user_id: int) -> list[dict]:

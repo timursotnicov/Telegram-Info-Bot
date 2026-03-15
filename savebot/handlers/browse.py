@@ -397,6 +397,18 @@ async def cmd_markread(message: types.Message, db=None):
         await message.reply(f"Запись #{item_id} не найдена.")
 
 
+# ── /clearall ──────────────────────────────────────────────
+
+@router.message(Command("clearall"))
+async def cmd_clearall(message: types.Message, db=None):
+    user_id = message.from_user.id
+    count = await queries.mark_all_read(db, user_id)
+    if count > 0:
+        await message.reply(f"✅ Отмечено прочитанным: {count} записей.")
+    else:
+        await message.reply("📖 Всё уже прочитано!")
+
+
 # ── /map ───────────────────────────────────────────────────
 
 @router.message(Command("map"))

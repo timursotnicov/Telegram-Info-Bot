@@ -1,10 +1,13 @@
-"""Management handlers: /edit, /delete, /stats, /categories, /export, /start, /help."""
+"""Management handlers: /edit, /delete, /stats, /categories, /export, /start, /help, /clear."""
 
 from __future__ import annotations
 
 import json
+import logging
+from collections import defaultdict
 
 from aiogram import F, Router, types
+from aiogram.errors import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -12,42 +15,95 @@ from savebot.db import queries
 from savebot.db.state_store import set_state
 
 router = Router()
+logger = logging.getLogger(__name__)
+
+# Track bot message IDs per user for /clear (in-memory, max 100 per user)
+_bot_messages: dict[int, list[int]] = defaultdict(list)
+_MAX_TRACKED = 100
+
+
+def track_message(user_id: int, message_id: int):
+    """Track a bot message ID for later cleanup via /clear."""
+    msgs = _bot_messages[user_id]
+    msgs.append(message_id)
+    if len(msgs) > _MAX_TRACKED:
+        _bot_messages[user_id] = msgs[-_MAX_TRACKED:]
 
 
 # ── /start and /help ────────────────────────────────────────
 
 @router.message(CommandStart())
 async def cmd_start(message: types.Message, **kwargs):
-    await message.reply(
-        "👋 <b>Привет! Я SaveBot</b> — твой персональный менеджер знаний в Telegram.\n\n"
-        "Просто отправь мне любой контент (текст, ссылку, файл, переслай сообщение), "
-        "и я автоматически предложу категорию и теги с помощью AI.\n\n"
-        "<b>Команды:</b>\n"
-        "/browse — просмотр по категориям\n"
-        "/tags — облако тегов\n"
-        "/search &lt;запрос&gt; — поиск\n"
-        "/ask &lt;вопрос&gt; — спросить базу знаний\n"
-        "/recent — последние 10 записей\n"
-        "/categories — управление категориями\n"
-        "/edit &lt;id&gt; — редактировать запись\n"
-        "/delete &lt;id&gt; — удалить запись\n"
-        "/stats — статистика\n"
-        "/export — экспорт в JSON\n"
-        "/pin &lt;id&gt; — закрепить запись\n"
-        "/unpin &lt;id&gt; — открепить запись\n"
-        "/pinned — закреплённые записи\n"
-        "/readlist — список чтения\n"
-        "/markread &lt;id&gt; — отметить прочитанным\n"
-        "/map — карта знаний\n"
-        "/forgotten — забытые записи\n"
-        "/settings — настройки",
+    result = await message.reply(
+        "👋 <b>Привет! Я SaveBot</b> — твоя вторая память.\n\n"
+        "Просто отправь мне текст, ссылку, фото или файл — "
+        "я сохраню и организую автоматически.\n\n"
+        "📂 Навигация: /browse /tags /map\n"
+        "🔍 Поиск: /search /ask\n"
+        "📌 Быстрый доступ: /recent /pinned /readlist\n"
+        "⚙️ Управление: /settings /stats /export\n"
+        "ℹ️ Подробнее: /help",
         parse_mode="HTML",
     )
+    track_message(message.from_user.id, result.message_id)
 
 
 @router.message(Command("help"))
 async def cmd_help(message: types.Message, **kwargs):
-    await cmd_start(message)
+    result = await message.reply(
+        "📖 <b>Все команды SaveBot:</b>\n\n"
+        "<b>📂 Навигация</b>\n"
+        "/browse — просмотр по категориям\n"
+        "/tags — облако тегов\n"
+        "/map — карта знаний\n"
+        "/forgotten — забытые записи\n\n"
+        "<b>🔍 Поиск</b>\n"
+        "/search &lt;запрос&gt; — поиск по записям\n"
+        "/ask &lt;вопрос&gt; — спросить базу знаний (AI)\n\n"
+        "<b>📌 Быстрый доступ</b>\n"
+        "/recent — последние 10 записей\n"
+        "/pinned — закреплённые записи\n"
+        "/readlist — список чтения\n\n"
+        "<b>✏️ Редактирование</b>\n"
+        "/edit &lt;id&gt; — редактировать запись\n"
+        "/delete &lt;id&gt; — удалить запись\n"
+        "/pin &lt;id&gt; — закрепить запись\n"
+        "/unpin &lt;id&gt; — открепить запись\n"
+        "/markread &lt;id&gt; — отметить прочитанным\n\n"
+        "<b>⚙️ Управление</b>\n"
+        "/categories — управление категориями\n"
+        "/stats — статистика\n"
+        "/export — экспорт в JSON\n"
+        "/settings — настройки\n\n"
+        "<b>🧹 Прочее</b>\n"
+        "/clear — очистить сообщения бота\n"
+        "/clearall — отметить всё прочитанным",
+        parse_mode="HTML",
+    )
+    track_message(message.from_user.id, result.message_id)
+
+
+# ── /clear ─────────────────────────────────────────────────
+
+@router.message(Command("clear"))
+async def cmd_clear(message: types.Message, **kwargs):
+    user_id = message.from_user.id
+    msg_ids = _bot_messages.pop(user_id, [])
+    deleted = 0
+    for msg_id in msg_ids:
+        try:
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+            deleted += 1
+        except TelegramBadRequest:
+            pass  # Message too old (>48h) or already deleted
+    # Also try to delete the /clear command message itself
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+    if deleted == 0 and not msg_ids:
+        result = await message.answer("🧹 Нет сообщений для очистки.")
+        track_message(user_id, result.message_id)
 
 
 # ── /stats ──────────────────────────────────────────────────
