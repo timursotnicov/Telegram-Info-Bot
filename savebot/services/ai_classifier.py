@@ -21,10 +21,12 @@ You will receive:
 - A list of frequently used tags
 
 Rules:
-1. Pick the BEST existing category, or suggest a new one if none fit.
-2. Suggest 1-3 relevant tags (short, lowercase, no #).
-3. Write a one-sentence summary in the same language as the content.
-4. For the category, also suggest an appropriate emoji.
+1. Pick the BEST existing category, or suggest a NEW descriptive one if none fit well.
+2. NEVER use generic names like "Inbox", "Other", "General", "Misc". Always pick a specific topic name.
+3. Good category examples: "Маркетинг", "Финансы", "Технологии", "Здоровье", "Рецепты", "Идеи", "Работа", "Обучение".
+4. Suggest 1-3 relevant tags (short, lowercase, no #).
+5. Write a one-sentence summary in the same language as the content.
+6. For the category, also suggest an appropriate emoji.
 
 Respond with ONLY valid JSON (no markdown, no code blocks):
 {"category": "CategoryName", "emoji": "📁", "tags": ["tag1", "tag2"], "summary": "Brief summary"}

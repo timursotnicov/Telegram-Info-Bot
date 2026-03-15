@@ -26,6 +26,7 @@ async def cmd_start(message: types.Message, **kwargs):
         "/browse — просмотр по категориям\n"
         "/tags — облако тегов\n"
         "/search &lt;запрос&gt; — поиск\n"
+        "/ask &lt;вопрос&gt; — спросить базу знаний\n"
         "/recent — последние 10 записей\n"
         "/categories — управление категориями\n"
         "/edit &lt;id&gt; — редактировать запись\n"

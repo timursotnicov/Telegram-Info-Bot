@@ -343,6 +343,72 @@ async def log_digest(db: aiosqlite.Connection, user_id: int, item_ids: list[int]
     await db.commit()
 
 
+def _escape_fts5(terms: list[str]) -> str:
+    """Escape terms for FTS5 MATCH. Wraps each term in double quotes."""
+    cleaned = []
+    for term in terms:
+        t = term.replace('"', '').strip()
+        if t:
+            cleaned.append(f'"{t}"')
+    return " ".join(cleaned)
+
+
+async def search_items_filtered(
+    db: aiosqlite.Connection,
+    user_id: int,
+    keywords: list[str] | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    category_hint: str | None = None,
+    tag_hint: str | None = None,
+    limit: int = 15,
+) -> list[dict]:
+    """Search items with AI-parsed filters: keywords (FTS5) + date + category + tag."""
+    conditions = ["i.user_id = ?"]
+    params: list = [user_id]
+    use_fts = False
+
+    if keywords:
+        fts_query = _escape_fts5(keywords)
+        if fts_query:
+            use_fts = True
+            conditions.append("items_fts MATCH ?")
+            params.append(fts_query)
+
+    if date_from:
+        conditions.append("i.created_at >= ?")
+        params.append(date_from)
+
+    if date_to:
+        conditions.append("i.created_at <= ?")
+        params.append(date_to + " 23:59:59")
+
+    if category_hint:
+        conditions.append("i.category_id IN (SELECT id FROM categories WHERE name LIKE ? AND user_id = ?)")
+        params.extend([f"%{category_hint}%", user_id])
+
+    if tag_hint:
+        conditions.append("i.id IN (SELECT item_id FROM item_tags WHERE tag LIKE ?)")
+        params.append(f"%{tag_hint}%")
+
+    where = " AND ".join(conditions)
+    params.append(limit)
+
+    if use_fts:
+        sql = f"""SELECT i.* FROM items_fts fts
+                  JOIN items i ON i.id = fts.rowid
+                  WHERE {where}
+                  ORDER BY rank LIMIT ?"""
+    else:
+        sql = f"""SELECT i.* FROM items i
+                  WHERE {where}
+                  ORDER BY i.created_at DESC LIMIT ?"""
+
+    cursor = await db.execute(sql, params)
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
 # ── Related Items ───────────────────────────────────────────
 
 async def get_items_with_shared_tags(db: aiosqlite.Connection, user_id: int, item_id: int, min_shared: int = 2, limit: int = 3) -> list[dict]:
