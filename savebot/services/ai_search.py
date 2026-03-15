@@ -61,7 +61,10 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
         "max_tokens": max_tokens,
     }
 
-    for attempt in range(2):
+    models_to_try = config.ai_fallback_models or [config.ai_model]
+
+    for model in models_to_try:
+        payload["model"] = model
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -70,6 +73,10 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=15),
                 ) as resp:
+                    if resp.status == 429:
+                        logger.warning("Model %s rate-limited (429), trying next", model)
+                        await asyncio.sleep(1)
+                        continue
                     if resp.status != 200:
                         logger.error("OpenRouter API error: %s", resp.status)
                         return None
@@ -82,11 +89,8 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
                 text = text[:-3]
             return text.strip()
         except asyncio.TimeoutError:
-            logger.warning("OpenRouter timeout (attempt %d/2)", attempt + 1)
-            if attempt == 0:
-                await asyncio.sleep(2)
-                continue
-            return None
+            logger.warning("OpenRouter timeout with model %s, trying next", model)
+            continue
         except (aiohttp.ClientError, KeyError) as e:
             logger.error("OpenRouter error: %s", e)
             return None

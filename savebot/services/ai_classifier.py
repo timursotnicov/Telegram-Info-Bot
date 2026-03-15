@@ -71,7 +71,10 @@ async def classify_content(
         "max_tokens": 300,
     }
 
-    for attempt in range(2):
+    models_to_try = config.ai_fallback_models or [config.ai_model]
+
+    for model in models_to_try:
+        payload["model"] = model
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -80,6 +83,10 @@ async def classify_content(
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=15),
                 ) as resp:
+                    if resp.status == 429:
+                        logger.warning("Model %s rate-limited (429), trying next", model)
+                        await asyncio.sleep(1)
+                        continue
                     if resp.status != 200:
                         logger.error("OpenRouter API error: %s %s", resp.status, await resp.text())
                         return None
@@ -102,18 +109,8 @@ async def classify_content(
                 "summary": result.get("summary", ""),
             }
         except asyncio.TimeoutError:
-            logger.warning("AI classification timeout (attempt %d/2)", attempt + 1)
-            if attempt == 0:
-                await asyncio.sleep(2)
-                continue
-            return None
-        except aiohttp.ClientResponseError as e:
-            if e.status >= 500 and attempt == 0:
-                logger.warning("AI classification server error %s (attempt 1/2), retrying", e.status)
-                await asyncio.sleep(2)
-                continue
-            logger.error("AI classification HTTP error: status=%s, message=%s", e.status, e.message)
-            return None
+            logger.warning("AI classification timeout with model %s, trying next", model)
+            continue
         except aiohttp.ClientError as e:
             logger.error("AI classification network error: %s", e)
             return None
