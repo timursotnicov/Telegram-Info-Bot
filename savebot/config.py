@@ -19,3 +19,12 @@ class Config:
 
 
 config = Config()
+
+
+def _parse_allowed_users():
+    users_str = os.getenv("ALLOWED_USERS", "")
+    if not users_str:
+        return []
+    return [int(u.strip()) for u in users_str.split(",") if u.strip()]
+
+config.allowed_users = _parse_allowed_users()
