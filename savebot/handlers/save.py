@@ -114,7 +114,7 @@ async def _process_content(message: types.Message, db):
     # Classify with AI
     ai_result = await classify_content(content_text, categories, tag_names)
     if not ai_result:
-        ai_result = {"category": "Inbox", "emoji": "📥", "tags": [], "summary": ""}
+        ai_result = {"category": "Несортированное", "emoji": "📥", "tags": [], "summary": ""}
 
     # Check user preferences
     prefs = await queries.get_user_preferences(db, user_id)
