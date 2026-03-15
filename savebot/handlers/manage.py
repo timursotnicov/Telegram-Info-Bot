@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 
 from aiogram import F, Router, types
-from aiogram.errors import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
