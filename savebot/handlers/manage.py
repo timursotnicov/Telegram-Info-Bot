@@ -9,13 +9,28 @@ from collections import defaultdict
 from aiogram import F, Router, types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 from savebot.db import queries
 from savebot.db.state_store import set_state
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📂 Browse"), KeyboardButton(text="🔍 Search")],
+        [KeyboardButton(text="📌 Pinned"), KeyboardButton(text="🕐 Recent")],
+        [KeyboardButton(text="📖 Read List"), KeyboardButton(text="⚙️ Settings")],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
 
 # Track bot message IDs per user for /clear (in-memory, max 100 per user)
 _bot_messages: dict[int, list[int]] = defaultdict(list)
@@ -38,11 +53,14 @@ async def cmd_start(message: types.Message, **kwargs):
         "👋 <b>Привет! Я SaveBot</b> — твоя вторая память.\n\n"
         "Просто отправь мне текст, ссылку, фото или файл — "
         "я сохраню и организую автоматически.\n\n"
-        "📂 Навигация: /browse /tags /map\n"
-        "🔍 Поиск: /search /ask\n"
-        "📌 Быстрый доступ: /recent /pinned /readlist\n"
-        "⚙️ Управление: /settings /stats /export\n"
+        "Используй кнопки внизу для быстрого доступа:\n"
+        "📂 Browse — просмотр по категориям\n"
+        "🔍 Search — поиск по записям\n"
+        "📌 Pinned / 🕐 Recent — закреплённые и последние\n"
+        "📖 Read List — список чтения\n"
+        "⚙️ Settings — настройки\n\n"
         "ℹ️ Подробнее: /help",
+        reply_markup=MAIN_KEYBOARD,
         parse_mode="HTML",
     )
     track_message(message.from_user.id, result.message_id)
@@ -51,33 +69,15 @@ async def cmd_start(message: types.Message, **kwargs):
 @router.message(Command("help"))
 async def cmd_help(message: types.Message, **kwargs):
     result = await message.reply(
-        "📖 <b>Все команды SaveBot:</b>\n\n"
-        "<b>📂 Навигация</b>\n"
+        "📖 <b>Справка SaveBot</b>\n\n"
+        "Основные команды:\n"
         "/browse — просмотр по категориям\n"
-        "/tags — облако тегов\n"
-        "/map — карта знаний\n"
-        "/forgotten — забытые записи\n\n"
-        "<b>🔍 Поиск</b>\n"
         "/search &lt;запрос&gt; — поиск по записям\n"
-        "/ask &lt;вопрос&gt; — спросить базу знаний (AI)\n\n"
-        "<b>📌 Быстрый доступ</b>\n"
-        "/recent — последние 10 записей\n"
-        "/pinned — закреплённые записи\n"
-        "/readlist — список чтения\n\n"
-        "<b>✏️ Редактирование</b>\n"
-        "/edit &lt;id&gt; — редактировать запись\n"
-        "/delete &lt;id&gt; — удалить запись\n"
-        "/pin &lt;id&gt; — закрепить запись\n"
-        "/unpin &lt;id&gt; — открепить запись\n"
-        "/markread &lt;id&gt; — отметить прочитанным\n\n"
-        "<b>⚙️ Управление</b>\n"
-        "/categories — управление категориями\n"
-        "/stats — статистика\n"
-        "/export — экспорт в JSON\n"
-        "/settings — настройки\n\n"
-        "<b>🧹 Прочее</b>\n"
-        "/clear — очистить сообщения бота\n"
-        "/clearall — отметить всё прочитанным",
+        "/ask &lt;вопрос&gt; — спросить базу знаний (AI)\n"
+        "/recent — последние записи\n"
+        "/help — эта справка\n\n"
+        "Остальные действия доступны через кнопки "
+        "в нижней панели клавиатуры.",
         parse_mode="HTML",
     )
     track_message(message.from_user.id, result.message_id)
@@ -178,6 +178,77 @@ async def on_cat_rename(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("cat_info:"))
+async def on_cat_info(callback: types.CallbackQuery, db=None):
+    cat_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+
+    # Get category with tag map for top tags
+    tag_map = await queries.get_category_tag_map(db, user_id)
+    cat = next((c for c in tag_map if c["id"] == cat_id), None)
+    if not cat:
+        await callback.message.edit_text("Категория не найдена.")
+        await callback.answer()
+        return
+
+    emoji = cat.get("emoji", "📁")
+    top_tags = cat.get("top_tags", [])[:3]
+    tags_str = ", ".join(f"#{t}" for t in top_tags) if top_tags else "нет тегов"
+
+    text = (
+        f"{emoji} <b>{cat['name']}</b>\n\n"
+        f"📝 Записей: {cat['item_count']}\n"
+        f"🏷 Топ теги: {tags_str}"
+    )
+
+    buttons = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✏️ Переименовать", callback_data=f"cat_rename:{cat_id}"),
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"cat_delete:{cat_id}"),
+    ], [
+        InlineKeyboardButton(text="🔙 К категориям", callback_data="cat_back"),
+    ]])
+
+    await callback.message.edit_text(text, reply_markup=buttons, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cat_back")
+async def on_cat_back(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
+    if not categories:
+        await callback.message.edit_text("Категорий пока нет.")
+        await callback.answer()
+        return
+
+    buttons = []
+    for cat in categories:
+        emoji = cat.get("emoji", "📁")
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{emoji} {cat['name']} ({cat['item_count']})",
+                callback_data=f"cat_info:{cat['id']}",
+            ),
+            InlineKeyboardButton(text="✏️", callback_data=f"cat_rename:{cat['id']}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"cat_delete:{cat['id']}"),
+        ])
+
+    await callback.message.edit_text(
+        "📂 <b>Управление категориями:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cat_add")
+async def on_cat_add(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    await set_state(db, f"new_browse_cat_{user_id}", user_id, "new_browse_cat", {})
+    await callback.message.edit_text("Введите название новой категории:", parse_mode="HTML")
+    await callback.answer()
+
+
 # ── /edit ───────────────────────────────────────────────────
 
 @router.message(Command("edit"))
@@ -249,31 +320,50 @@ async def on_edit_category(callback: types.CallbackQuery, db=None):
 @router.message(Command("delete"))
 async def cmd_delete(message: types.Message, db=None, **kwargs):
     parts = message.text.split()
-    if len(parts) < 2:
-        await message.reply("Использование: /delete <id>")
+    if len(parts) >= 2:
+        # /delete <id> — direct delete with confirmation
+        try:
+            item_id = int(parts[1])
+        except ValueError:
+            await message.reply("ID должен быть числом.")
+            return
+
+        buttons = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"dconf:{item_id}"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="dcancel"),
+        ]])
+        await message.reply(
+            f"Удалить запись #{item_id}?",
+            reply_markup=buttons,
+            parse_mode="HTML",
+        )
         return
 
-    try:
-        item_id = int(parts[1])
-    except ValueError:
-        await message.reply("ID должен быть числом.")
+    # /delete without args — show recent items as delete picker
+    user_id = message.from_user.id
+    items = await queries.get_recent_items(db, user_id, limit=10)
+    if not items:
+        await message.reply("Нет записей для удаления.")
         return
 
-    buttons = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"confirm_delete:{item_id}"),
-        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_delete"),
-    ]])
+    buttons = []
+    for item in items:
+        title = (item.get("content_text") or "без текста")[:40]
+        buttons.append([InlineKeyboardButton(
+            text=f"🗑 #{item['id']} {title}",
+            callback_data=f"dpick:{item['id']}",
+        )])
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="dcancel")])
 
     await message.reply(
-        f"Удалить запись #{item_id}?",
-        reply_markup=buttons,
+        "🗑 <b>Выберите запись для удаления:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
 
 
-@router.callback_query(F.data.startswith("confirm_delete:"))
-async def on_confirm_delete(callback: types.CallbackQuery, db=None):
-    item_id = int(callback.data.split(":")[1])
+async def _do_delete_confirm(callback: types.CallbackQuery, db, item_id: int):
+    """Shared delete confirmation logic for picker and item view flows."""
     user_id = callback.from_user.id
     deleted = await queries.delete_item(db, user_id, item_id)
     if deleted:
@@ -283,8 +373,29 @@ async def on_confirm_delete(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
-@router.callback_query(F.data == "cancel_delete")
-async def on_cancel_delete(callback: types.CallbackQuery, **kwargs):
+@router.callback_query(F.data.startswith("dpick:"))
+async def on_delete_pick(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[1])
+    buttons = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"dconf:{item_id}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="dcancel"),
+    ]])
+    await callback.message.edit_text(
+        f"Удалить запись #{item_id}?",
+        reply_markup=buttons,
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dconf:"))
+async def on_delete_confirm(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[1])
+    await _do_delete_confirm(callback, db, item_id)
+
+
+@router.callback_query(F.data == "dcancel")
+async def on_delete_cancel(callback: types.CallbackQuery, **kwargs):
     await callback.message.edit_text("Отменено.")
     await callback.answer()
 

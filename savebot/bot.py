@@ -12,7 +12,7 @@ from aiohttp import web
 
 from savebot.config import config
 from savebot.db.models import init_db
-from savebot.handlers import browse, inline, manage, save, settings
+from savebot.handlers import browse, inline, manage, menu, save, settings
 from savebot.middleware import ErrorMiddleware
 from savebot.scheduler import start_scheduler, stop_scheduler
 
@@ -25,14 +25,10 @@ logger = logging.getLogger(__name__)
 
 async def set_bot_commands(bot: Bot):
     commands = [
-        BotCommand(command="browse", description="Просмотр по категориям"),
+        BotCommand(command="browse", description="Навигация по записям"),
         BotCommand(command="search", description="Поиск"),
-        BotCommand(command="ask", description="Спросить базу знаний"),
+        BotCommand(command="ask", description="Спросить AI"),
         BotCommand(command="recent", description="Последние записи"),
-        BotCommand(command="pinned", description="Закреплённые"),
-        BotCommand(command="readlist", description="Список чтения"),
-        BotCommand(command="map", description="Карта знаний"),
-        BotCommand(command="settings", description="Настройки"),
         BotCommand(command="help", description="Помощь"),
     ]
     await bot.set_my_commands(commands)
@@ -60,9 +56,11 @@ async def main():
     # Error-catching middleware (runs first, wraps everything)
     dp.update.middleware(ErrorMiddleware())
 
-    # Register routers — settings first, then manage (commands), browse, save (catch-all)
+    # Register routers — settings first, then manage (commands), menu (keyboard + states),
+    # browse, inline, save (catch-all last)
     dp.include_router(settings.router)
     dp.include_router(manage.router)
+    dp.include_router(menu.router)
     dp.include_router(browse.router)
     dp.include_router(inline.router)
     dp.include_router(save.router)

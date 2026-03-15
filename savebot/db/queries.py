@@ -523,3 +523,117 @@ async def get_items_in_same_category(db: aiosqlite.Connection, user_id: int, ite
     )
     items = [dict(r) for r in await cursor.fetchall()]
     return await _attach_tags(db, items)
+
+
+# ── Navigation ─────────────────────────────────────────────
+
+def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, list, str]:
+    """Return (WHERE clause, params, ORDER BY) for a given context type."""
+    if context_type == "category":
+        return "i.category_id = ? AND i.user_id = ?", [context_id], "i.created_at DESC"
+    elif context_type == "tag":
+        return (
+            "i.id IN (SELECT item_id FROM item_tags WHERE tag = ?) AND i.user_id = ?",
+            [context_id],
+            "i.created_at DESC",
+        )
+    elif context_type == "recent":
+        return "i.user_id = ?", [], "i.created_at DESC"
+    elif context_type == "pinned":
+        return "i.is_pinned = 1 AND i.user_id = ?", [], "i.created_at DESC"
+    elif context_type == "readlist":
+        return "i.is_read = 0 AND i.user_id = ?", [], "i.created_at DESC"
+    elif context_type == "forgotten":
+        return (
+            "i.is_pinned = 0 AND i.created_at < datetime('now', '-30 days') AND i.user_id = ?",
+            [],
+            "i.created_at ASC",
+        )
+    else:
+        raise ValueError(f"Unknown context_type: {context_type}")
+
+
+async def get_adjacent_item_ids(
+    db: aiosqlite.Connection,
+    user_id: int,
+    item_id: int,
+    context_type: str,
+    context_id: str | int | None = None,
+) -> dict | None:
+    """Return {prev_id, next_id, position, total} for an item within a browsing context."""
+    where, extra_params, order = _context_sql(context_type, context_id)
+    params = extra_params + [user_id]
+
+    cursor = await db.execute(
+        f"""WITH ctx AS (
+                SELECT i.id,
+                       LAG(i.id) OVER (ORDER BY {order}) AS prev_id,
+                       LEAD(i.id) OVER (ORDER BY {order}) AS next_id,
+                       ROW_NUMBER() OVER (ORDER BY {order}) AS position,
+                       COUNT(*) OVER () AS total
+                FROM items i
+                WHERE {where}
+            )
+            SELECT * FROM ctx WHERE id = ?""",
+        params + [item_id],
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    return dict(row)
+
+
+async def get_items_page_with_nums(
+    db: aiosqlite.Connection,
+    user_id: int,
+    context_type: str,
+    context_id: str | int | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> list[dict]:
+    """Return items with display_num for clickable list view, including category info."""
+    where, extra_params, order = _context_sql(context_type, context_id)
+    params = extra_params + [user_id, limit, offset]
+
+    cursor = await db.execute(
+        f"""SELECT sub.*, c.name AS category_name, c.emoji AS category_emoji
+            FROM (
+                SELECT i.*,
+                       ROW_NUMBER() OVER (ORDER BY {order}) AS display_num
+                FROM items i
+                WHERE {where}
+            ) sub
+            LEFT JOIN categories c ON c.id = sub.category_id
+            ORDER BY sub.display_num
+            LIMIT ? OFFSET ?""",
+        params,
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+async def count_items_by_tag(db: aiosqlite.Connection, user_id: int, tag: str) -> int:
+    """Exact count of items with a given tag."""
+    cursor = await db.execute(
+        """SELECT COUNT(*) AS c FROM item_tags t
+           JOIN items i ON i.id = t.item_id
+           WHERE t.tag = ? AND i.user_id = ?""",
+        (tag, user_id),
+    )
+    return (await cursor.fetchone())["c"]
+
+
+async def create_category_manual(
+    db: aiosqlite.Connection, user_id: int, name: str, emoji: str = "\U0001f4c1"
+) -> dict:
+    """Create a category, raising ValueError if a duplicate name exists for this user."""
+    cursor = await db.execute(
+        "SELECT * FROM categories WHERE name = ? AND user_id = ?", (name, user_id)
+    )
+    if await cursor.fetchone():
+        raise ValueError(f"Category '{name}' already exists")
+    cursor = await db.execute(
+        "INSERT INTO categories (name, user_id, emoji) VALUES (?, ?, ?)", (name, user_id, emoji)
+    )
+    await db.commit()
+    return {"id": cursor.lastrowid, "name": name, "user_id": user_id, "emoji": emoji}
