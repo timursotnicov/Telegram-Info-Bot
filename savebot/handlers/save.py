@@ -1,5 +1,6 @@
 """Save flow handler — auto-save with AI categorization."""
 from __future__ import annotations
+import html
 import logging
 
 from aiogram import F, Router, types
@@ -147,7 +148,7 @@ async def _process_content(message: types.Message, db):
         if tags_str:
             text += f" / {tags_str}"
         if ai_result.get("summary"):
-            text += f"\n<i>{ai_result['summary']}</i>"
+            text += f"\n<i>{html.escape(ai_result['summary'])}</i>"
 
         # Find related items
         related = await find_related_items(
@@ -191,7 +192,7 @@ async def _process_content(message: types.Message, db):
             f"Теги: {tags_str}\n"
         )
         if ai_result.get("summary"):
-            text += f"<i>Саммари: {ai_result['summary']}</i>\n"
+            text += f"<i>Саммари: {html.escape(ai_result['summary'])}</i>\n"
 
         await message.reply(text, reply_markup=_confirm_keyboard(pending_key), parse_mode="HTML")
 
