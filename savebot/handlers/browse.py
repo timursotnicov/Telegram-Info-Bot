@@ -30,7 +30,8 @@ def _format_item(item: dict) -> str:
 
 @router.message(Command("browse"))
 async def cmd_browse(message: types.Message, db=None):
-    categories = await queries.get_all_categories(db)
+    user_id = message.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
     if not categories:
         await message.reply("Пока нет сохранённых записей. Отправьте мне что-нибудь!")
         return
@@ -61,9 +62,10 @@ async def on_browse_category(callback: types.CallbackQuery, db=None):
     parts = callback.data.split(":")
     cat_id = int(parts[1])
     offset = int(parts[2])
+    user_id = callback.from_user.id
 
-    items = await queries.get_items_by_category(db, cat_id, limit=PAGE_SIZE, offset=offset)
-    total = await queries.count_items_in_category(db, cat_id)
+    items = await queries.get_items_by_category(db, user_id, cat_id, limit=PAGE_SIZE, offset=offset)
+    total = await queries.count_items_in_category(db, user_id, cat_id)
 
     if not items:
         await callback.answer("В этой категории пока нет записей.")
@@ -97,7 +99,8 @@ async def on_browse_category(callback: types.CallbackQuery, db=None):
 
 @router.callback_query(F.data == "browse_back")
 async def on_browse_back(callback: types.CallbackQuery, db=None):
-    categories = await queries.get_all_categories(db)
+    user_id = callback.from_user.id
+    categories = await queries.get_all_categories(db, user_id)
     buttons = []
     for cat in categories:
         emoji = cat.get("emoji", "📁")
@@ -118,7 +121,8 @@ async def on_browse_back(callback: types.CallbackQuery, db=None):
 
 @router.message(Command("tags"))
 async def cmd_tags(message: types.Message, db=None):
-    tags = await queries.get_all_tags(db)
+    user_id = message.from_user.id
+    tags = await queries.get_all_tags(db, user_id)
     if not tags:
         await message.reply("Тегов пока нет.")
         return
@@ -148,8 +152,9 @@ async def on_tag_items(callback: types.CallbackQuery, db=None):
     parts = callback.data.split(":")
     tag = parts[1]
     offset = int(parts[2])
+    user_id = callback.from_user.id
 
-    items = await queries.get_items_by_tag(db, tag, limit=PAGE_SIZE, offset=offset)
+    items = await queries.get_items_by_tag(db, user_id, tag, limit=PAGE_SIZE, offset=offset)
     if not items:
         await callback.answer("Записей с этим тегом нет.")
         return
@@ -179,12 +184,13 @@ async def on_tag_items(callback: types.CallbackQuery, db=None):
 
 @router.message(Command("search"))
 async def cmd_search(message: types.Message, db=None):
+    user_id = message.from_user.id
     query = message.text.replace("/search", "", 1).strip()
     if not query:
         await message.reply("Использование: /search <запрос>")
         return
 
-    items = await queries.search_items(db, query)
+    items = await queries.search_items(db, user_id, query)
     if not items:
         await message.reply(f"🔍 По запросу «{query}» ничего не найдено.")
         return
@@ -198,7 +204,8 @@ async def cmd_search(message: types.Message, db=None):
 
 @router.message(Command("recent"))
 async def cmd_recent(message: types.Message, db=None):
-    items = await queries.get_recent_items(db, limit=10)
+    user_id = message.from_user.id
+    items = await queries.get_recent_items(db, user_id, limit=10)
     if not items:
         await message.reply("Пока нет сохранённых записей.")
         return
