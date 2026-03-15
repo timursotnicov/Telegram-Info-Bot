@@ -33,6 +33,11 @@ async def cmd_start(message: types.Message, **kwargs):
         "/delete &lt;id&gt; — удалить запись\n"
         "/stats — статистика\n"
         "/export — экспорт в JSON\n"
+        "/pin &lt;id&gt; — закрепить запись\n"
+        "/unpin &lt;id&gt; — открепить запись\n"
+        "/pinned — закреплённые записи\n"
+        "/readlist — список чтения\n"
+        "/markread &lt;id&gt; — отметить прочитанным\n"
         "/settings — настройки",
         parse_mode="HTML",
     )

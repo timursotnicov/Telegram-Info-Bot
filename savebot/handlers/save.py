@@ -20,6 +20,7 @@ def _post_save_keyboard(item_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🔄 Изменить", callback_data=f"autosave_change:{item_id}"),
         InlineKeyboardButton(text="🗑 Удалить", callback_data=f"autosave_delete:{item_id}"),
+        InlineKeyboardButton(text="📌 Pin", callback_data=f"autosave_pin:{item_id}"),
     ]])
 
 
@@ -161,6 +162,13 @@ async def _process_content(message: types.Message, db):
                 r_summary = r.get("ai_summary") or r["content_text"][:60]
                 text += f"\n  #{r['id']} {r_summary}"
 
+        # Links are unread by default
+        if content_type == "link":
+            await db.execute(
+                "UPDATE items SET is_read = 0 WHERE id = ?", (item_id,)
+            )
+            await db.commit()
+
         await message.reply(text, reply_markup=_post_save_keyboard(item_id), parse_mode="HTML")
 
     else:
@@ -263,6 +271,14 @@ async def on_autosave_pick(callback: types.CallbackQuery, db=None):
         reply_markup=_post_save_keyboard(item_id),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("autosave_pin:"))
+async def on_autosave_pin(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    await queries.pin_item(db, user_id, item_id)
+    await callback.answer("📌 Закреплено!")
 
 
 @router.callback_query(F.data.startswith("autosave_delete:"))

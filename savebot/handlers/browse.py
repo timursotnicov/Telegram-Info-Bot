@@ -303,3 +303,93 @@ async def cmd_recent(message: types.Message, db=None):
     text = "🕐 <b>Последние записи:</b>\n\n"
     text += "\n\n".join(_format_item(item) for item in items)
     await message.reply(text, parse_mode="HTML")
+
+
+# ── /pinned ────────────────────────────────────────────────
+
+@router.message(Command("pinned"))
+async def cmd_pinned(message: types.Message, db=None):
+    user_id = message.from_user.id
+    items = await queries.get_pinned_items(db, user_id)
+    if not items:
+        await message.reply("📌 Нет закреплённых записей. Используйте /pin <id> чтобы закрепить.")
+        return
+
+    text = "📌 <b>Закреплённые записи:</b>\n\n"
+    text += "\n\n".join(_format_item(item) for item in items)
+    await message.reply(text, parse_mode="HTML")
+
+
+@router.message(Command("pin"))
+async def cmd_pin(message: types.Message, db=None):
+    user_id = message.from_user.id
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: /pin <id>")
+        return
+    try:
+        item_id = int(parts[1])
+    except ValueError:
+        await message.reply("ID должен быть числом.")
+        return
+
+    if await queries.pin_item(db, user_id, item_id):
+        await message.reply(f"📌 Запись #{item_id} закреплена.")
+    else:
+        await message.reply(f"Запись #{item_id} не найдена.")
+
+
+@router.message(Command("unpin"))
+async def cmd_unpin(message: types.Message, db=None):
+    user_id = message.from_user.id
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: /unpin <id>")
+        return
+    try:
+        item_id = int(parts[1])
+    except ValueError:
+        await message.reply("ID должен быть числом.")
+        return
+
+    if await queries.unpin_item(db, user_id, item_id):
+        await message.reply(f"📌 Запись #{item_id} откреплена.")
+    else:
+        await message.reply(f"Запись #{item_id} не найдена.")
+
+
+# ── /readlist ──────────────────────────────────────────────
+
+@router.message(Command("readlist"))
+async def cmd_readlist(message: types.Message, db=None):
+    user_id = message.from_user.id
+    items = await queries.get_unread_items(db, user_id)
+    if not items:
+        await message.reply("📖 Всё прочитано! Нет непрочитанных записей.")
+        return
+
+    text = f"📖 <b>Список чтения ({len(items)} непрочитанных):</b>\n\n"
+    for item in items:
+        formatted = _format_item(item)
+        text += formatted + "\n"
+        text += f"  → /markread {item['id']}\n\n"
+    await message.reply(text, parse_mode="HTML")
+
+
+@router.message(Command("markread"))
+async def cmd_markread(message: types.Message, db=None):
+    user_id = message.from_user.id
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: /markread <id>")
+        return
+    try:
+        item_id = int(parts[1])
+    except ValueError:
+        await message.reply("ID должен быть числом.")
+        return
+
+    if await queries.mark_item_read(db, user_id, item_id):
+        await message.reply(f"✅ Запись #{item_id} отмечена как прочитанная.")
+    else:
+        await message.reply(f"Запись #{item_id} не найдена.")

@@ -18,6 +18,14 @@ MIGRATIONS = [
     """
     CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
     """,
+    # Migration 5: Add is_pinned column to items
+    """
+    ALTER TABLE items ADD COLUMN is_pinned BOOLEAN DEFAULT 0;
+    """,
+    # Migration 6: Add is_read column to items (1=read by default, links set to 0 on save)
+    """
+    ALTER TABLE items ADD COLUMN is_read BOOLEAN DEFAULT 1;
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):

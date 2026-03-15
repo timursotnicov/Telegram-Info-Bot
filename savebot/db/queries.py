@@ -409,6 +409,52 @@ async def search_items_filtered(
     return await _attach_tags(db, items)
 
 
+# ── Pin / Favorites ────────────────────────────────────────
+
+async def pin_item(db: aiosqlite.Connection, user_id: int, item_id: int) -> bool:
+    cursor = await db.execute(
+        "UPDATE items SET is_pinned = 1 WHERE id = ? AND user_id = ?", (item_id, user_id)
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
+async def unpin_item(db: aiosqlite.Connection, user_id: int, item_id: int) -> bool:
+    cursor = await db.execute(
+        "UPDATE items SET is_pinned = 0 WHERE id = ? AND user_id = ?", (item_id, user_id)
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
+async def get_pinned_items(db: aiosqlite.Connection, user_id: int, limit: int = 20) -> list[dict]:
+    cursor = await db.execute(
+        "SELECT * FROM items WHERE user_id = ? AND is_pinned = 1 ORDER BY created_at DESC LIMIT ?",
+        (user_id, limit),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+# ── Reading List ───────────────────────────────────────────
+
+async def get_unread_items(db: aiosqlite.Connection, user_id: int, limit: int = 20) -> list[dict]:
+    cursor = await db.execute(
+        "SELECT * FROM items WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT ?",
+        (user_id, limit),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+async def mark_item_read(db: aiosqlite.Connection, user_id: int, item_id: int) -> bool:
+    cursor = await db.execute(
+        "UPDATE items SET is_read = 1 WHERE id = ? AND user_id = ?", (item_id, user_id)
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
 # ── Related Items ───────────────────────────────────────────
 
 async def get_items_with_shared_tags(db: aiosqlite.Connection, user_id: int, item_id: int, min_shared: int = 2, limit: int = 3) -> list[dict]:
