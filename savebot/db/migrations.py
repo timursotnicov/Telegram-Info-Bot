@@ -26,6 +26,10 @@ MIGRATIONS = [
     """
     ALTER TABLE items ADD COLUMN is_read BOOLEAN DEFAULT 1;
     """,
+    # Migration 7: Add forward_url column for original post link
+    """
+    ALTER TABLE items ADD COLUMN forward_url TEXT;
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):

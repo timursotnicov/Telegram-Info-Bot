@@ -23,10 +23,16 @@ You will receive:
 Rules:
 1. Pick the BEST existing category, or suggest a NEW descriptive one if none fit well.
 2. NEVER use generic names like "Inbox", "Other", "General", "Misc". Always pick a specific topic name.
-3. Good category examples: "Маркетинг", "Финансы", "Технологии", "Здоровье", "Рецепты", "Идеи", "Работа", "Обучение".
-4. Suggest 1-3 relevant tags (short, lowercase, no #).
-5. Write a one-sentence summary in the same language as the content.
-6. For the category, also suggest an appropriate emoji.
+3. Предпочитай КОНКРЕТНЫЕ подкатегории вместо общих. Примеры:
+   - НЕ «Технологии» → а «Искусственный интеллект», «Веб-разработка», «Кибербезопасность»
+   - НЕ «Бизнес» → а «Маркетинг», «Стартапы», «Финансы», «Продажи»
+   - НЕ «Наука» → а «Космос», «Биология», «Физика»
+   - НЕ «Образование» → а «Программирование», «Языки», «Саморазвитие»
+4. Используй существующую категорию ТОЛЬКО если контент точно попадает в её тематику. Если нет — создай новую более конкретную.
+5. Длина названия категории: 1-3 слова. Не длиннее.
+6. Suggest 1-3 relevant tags (short, lowercase, no #).
+7. Write a one-sentence summary in the same language as the content.
+8. For the category, also suggest an appropriate emoji.
 
 Respond with ONLY valid JSON (no markdown, no code blocks):
 {"category": "CategoryName", "emoji": "📁", "tags": ["tag1", "tag2"], "summary": "Brief summary"}

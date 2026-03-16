@@ -78,6 +78,10 @@ def _format_item_full(item: dict, position: int | None = None, total: int | None
     if tags:
         parts.append("\n" + " ".join(f"#{t}" for t in tags))
 
+    # Source (for forwards)
+    if item.get("source"):
+        parts.append(f"\n📨 Переслано из: {html.escape(item['source'])}")
+
     # URL
     if item.get("url"):
         parts.append(f"\n🔗 {item['url']}")
@@ -464,8 +468,13 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     actions1.append(InlineKeyboardButton(text="🗑 Удалить", callback_data=f"va:del:{item_id}"))
     buttons.append(actions1)
 
-    # Action row 2: mark read, back to list
+    # Forward original post button
+    if item.get("forward_url"):
+        buttons.append([InlineKeyboardButton(text="📨 Оригинал", url=item["forward_url"])])
+
+    # Action row 2: tags, mark read, back to list
     actions2 = []
+    actions2.append(InlineKeyboardButton(text="🏷 Теги", callback_data=f"va:tags:{item_id}"))
     if not item.get("is_read"):
         actions2.append(InlineKeyboardButton(text="✅ Прочитано", callback_data=f"va:read:{item_id}"))
     # Back to list
@@ -653,6 +662,28 @@ async def on_action_read(callback: types.CallbackQuery, db=None):
                     ctx_id = parts[2]
                     await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db)
                     return
+
+
+@router.callback_query(F.data.startswith("va:tags:"))
+async def on_action_tags(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+
+    item = await queries.get_item(db, user_id, item_id)
+    if not item:
+        await callback.answer("Запись не найдена.")
+        return
+
+    tags = item.get("tags", [])
+    tags_str = " ".join(f"#{t}" for t in tags) if tags else "нет тегов"
+
+    await set_state(db, f"edit_tags_{user_id}", user_id, "edit_tags", {"item_id": item_id})
+    await callback.message.edit_text(
+        f"🏷 <b>Текущие теги:</b> {tags_str}\n\n"
+        f"Введите новые теги через пробел (без #):",
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 # ── Legacy /tags command ──────────────────────────────────

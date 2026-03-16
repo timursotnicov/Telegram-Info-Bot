@@ -12,7 +12,7 @@ Use 2-3 character prefixes + colon separator:
 | `vi:` | View item (single) | `vi:c:5:42` |
 | `vn:` | View navigate (prev/next) | `vn:c:5:43` |
 | `vl:` | View list (paginate) | `vl:c:5:10` |
-| `va:` | View action (on item) | `va:pin:42`, `va:del:42` |
+| `va:` | View action (on item) | `va:pin:42`, `va:del:42`, `va:tags:42` |
 | `browse_cat:` | Category items list | `browse_cat:5:0` |
 | `tag_items:` | Tag items list | `tag_items:ai:0` |
 | `settings_*` | Settings toggles | `settings_toggle:auto_save` |

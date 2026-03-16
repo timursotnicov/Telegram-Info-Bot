@@ -41,6 +41,7 @@ async def _detect_content(message: types.Message):
     url = None
     file_id = None
     source = None
+    forward_url = None
 
     if message.forward_origin:
         content_type = "forward"
@@ -49,8 +50,25 @@ async def _detect_content(message: types.Message):
             source = message.forward_origin.sender_user.full_name
         elif hasattr(message.forward_origin, "chat") and message.forward_origin.chat:
             source = message.forward_origin.chat.title or message.forward_origin.chat.full_name
+            # Build forward_url for MessageOriginChannel
+            chat = message.forward_origin.chat
+            if chat.username:
+                forward_url = f"https://t.me/{chat.username}/{message.forward_origin.message_id}"
+            else:
+                clean_id = str(chat.id).replace("-100", "")
+                forward_url = f"https://t.me/c/{clean_id}/{message.forward_origin.message_id}"
         elif hasattr(message.forward_origin, "sender_user_name"):
             source = message.forward_origin.sender_user_name
+        # Extract URL from entities for forwards
+        entities = message.entities or message.caption_entities or []
+        for entity in entities:
+            if entity.type == "url":
+                text = message.text or message.caption or ""
+                url = text[entity.offset:entity.offset + entity.length]
+                break
+            elif entity.type == "text_link":
+                url = entity.url
+                break
     elif message.document:
         content_type = "file"
         content_text = message.caption or message.document.file_name or "document"
@@ -98,13 +116,13 @@ async def _detect_content(message: types.Message):
     if not content_text:
         content_text = message.text or message.caption or ""
 
-    return content_type, content_text, url, file_id, source
+    return content_type, content_text, url, file_id, source, forward_url
 
 
 async def _process_content(message: types.Message, db):
     """Process incoming content — auto-save or manual mode."""
     user_id = message.from_user.id
-    content_type, content_text, url, file_id, source = await _detect_content(message)
+    content_type, content_text, url, file_id, source, forward_url = await _detect_content(message)
 
     # Check for duplicates
     dup = await queries.find_duplicate(db, user_id, content_text, url)
@@ -141,6 +159,7 @@ async def _process_content(message: types.Message, db):
             url=url, file_id=file_id, source=source,
             ai_summary=ai_result.get("summary"),
             tg_message_id=message.message_id,
+            forward_url=forward_url,
         )
 
         tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
@@ -183,6 +202,7 @@ async def _process_content(message: types.Message, db):
             "source": source,
             "ai_result": ai_result,
             "tg_message_id": message.message_id,
+            "forward_url": forward_url,
         })
 
         tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
@@ -315,6 +335,7 @@ async def on_save_confirm(callback: types.CallbackQuery, db=None):
         url=data.get("url"), file_id=data.get("file_id"),
         source=data.get("source"), ai_summary=ai.get("summary"),
         tg_message_id=data.get("tg_message_id"),
+        forward_url=data.get("forward_url"),
     )
 
     tags_str = " ".join(f"#{t}" for t in ai["tags"])
@@ -376,6 +397,7 @@ async def on_pick_category(callback: types.CallbackQuery, db=None):
         url=data.get("url"), file_id=data.get("file_id"),
         source=data.get("source"), ai_summary=ai.get("summary"),
         tg_message_id=data.get("tg_message_id"),
+        forward_url=data.get("forward_url"),
     )
 
     cats = await queries.get_all_categories(db, user_id)

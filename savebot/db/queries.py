@@ -92,11 +92,12 @@ async def save_item(
     source: str | None = None,
     ai_summary: str | None = None,
     tg_message_id: int | None = None,
+    forward_url: str | None = None,
 ) -> int:
     cursor = await db.execute(
-        """INSERT INTO items (category_id, content_type, content_text, url, file_id, source, ai_summary, tg_message_id, user_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (category_id, content_type, content_text, url, file_id, source, ai_summary, tg_message_id, user_id),
+        """INSERT INTO items (category_id, content_type, content_text, url, file_id, source, ai_summary, tg_message_id, user_id, forward_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (category_id, content_type, content_text, url, file_id, source, ai_summary, tg_message_id, user_id, forward_url),
     )
     item_id = cursor.lastrowid
     for tag in tags:
