@@ -112,14 +112,33 @@ def _clickable_list_buttons(
     ctx_id: str | int,
     offset: int,
     total: int,
+    deleting_item_id: int | None = None,
 ) -> list[list[InlineKeyboardButton]]:
     """Build clickable item buttons + pagination for a list view."""
     buttons = []
     for item in items:
-        num = item.get("display_num", item["id"])
-        title = _format_item_short(item)
-        cb = f"vi:{ctx_short}:{ctx_id}:{item['id']}"
-        buttons.append([InlineKeyboardButton(text=f"{num}. {title}", callback_data=cb)])
+        if deleting_item_id and item["id"] == deleting_item_id:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"Удалить #{item['id']}?", callback_data="noop",
+                ),
+                InlineKeyboardButton(
+                    text="✅", callback_data=f"vy:{ctx_short}:{ctx_id}:{item['id']}:{offset}",
+                ),
+                InlineKeyboardButton(
+                    text="❌", callback_data=f"vx:{ctx_short}:{ctx_id}:{offset}",
+                ),
+            ])
+        else:
+            num = item.get("display_num", item["id"])
+            title = _format_item_short(item)
+            cb = f"vi:{ctx_short}:{ctx_id}:{item['id']}"
+            buttons.append([
+                InlineKeyboardButton(text=f"{num}. {title}", callback_data=cb),
+                InlineKeyboardButton(
+                    text="🗑", callback_data=f"vd:{ctx_short}:{ctx_id}:{item['id']}:{offset}",
+                ),
+            ])
 
     # Pagination row
     page = offset // PAGE_SIZE + 1
@@ -341,7 +360,7 @@ async def on_hub_newcat(callback: types.CallbackQuery, db=None):
 
 # ── Clickable List View ───────────────────────────────────
 
-async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: str | int, offset: int, db=None):
+async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: str | int, offset: int, db=None, deleting_item_id: int | None = None):
     """Show a clickable item list for any context."""
     if db is None:
         db = callback.bot.get("db")
@@ -386,7 +405,7 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     else:
         title = f"{title} ({total})"
 
-    buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total)
+    buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id)
     buttons.append([_back_button_for_ctx(ctx_short)])
 
     await callback.message.edit_text(
@@ -424,6 +443,80 @@ async def on_tags_back(callback: types.CallbackQuery, db=None):
 @router.callback_query(F.data.startswith("vl:"))
 async def on_list_page(callback: types.CallbackQuery, db=None):
     # vl:{ctx_short}:{ctx_id}:{offset}
+    parts = callback.data.split(":")
+    ctx_short = parts[1]
+    ctx_id = parts[2]
+    offset = int(parts[3])
+    context_type = _CTX_REV.get(ctx_short, "recent")
+    await _show_list(callback, context_type, ctx_id, offset, db=db)
+
+
+@router.callback_query(F.data.startswith("vd:"))
+async def on_list_delete(callback: types.CallbackQuery, db=None):
+    # vd:{ctx_short}:{ctx_id}:{item_id}:{offset}
+    parts = callback.data.split(":")
+    ctx_short = parts[1]
+    ctx_id = parts[2]
+    item_id = int(parts[3])
+    offset = int(parts[4])
+    context_type = _CTX_REV.get(ctx_short, "recent")
+    await _show_list(callback, context_type, ctx_id, offset, db=db, deleting_item_id=item_id)
+
+
+@router.callback_query(F.data.startswith("vy:"))
+async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
+    # vy:{ctx_short}:{ctx_id}:{item_id}:{offset}
+    parts = callback.data.split(":")
+    ctx_short = parts[1]
+    ctx_id = parts[2]
+    item_id = int(parts[3])
+    offset = int(parts[4])
+    user_id = callback.from_user.id
+
+    if db is None:
+        db = callback.bot.get("db")
+
+    deleted = await queries.delete_item(db, user_id, item_id)
+    if not deleted:
+        await callback.answer("Запись не найдена.")
+        return
+
+    await callback.answer("🗑 Удалено")
+
+    context_type = _CTX_REV.get(ctx_short, "recent")
+
+    # Check if current page still has items
+    items = await queries.get_items_page_with_nums(
+        db, user_id, context_type,
+        context_id=ctx_id if context_type in ("category", "tag") else None,
+        limit=PAGE_SIZE, offset=offset,
+    )
+    # If page is empty after delete, go back one page
+    if not items and offset > 0:
+        offset = max(0, offset - PAGE_SIZE)
+
+    # Re-check after adjusted offset
+    items = await queries.get_items_page_with_nums(
+        db, user_id, context_type,
+        context_id=ctx_id if context_type in ("category", "tag") else None,
+        limit=PAGE_SIZE, offset=offset,
+    )
+    if not items:
+        await callback.message.edit_text(
+            "📋 <b>Список пуст.</b>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [_back_button_for_ctx(ctx_short)]
+            ]),
+            parse_mode="HTML",
+        )
+        return
+
+    await _show_list(callback, context_type, ctx_id, offset, db=db)
+
+
+@router.callback_query(F.data.startswith("vx:"))
+async def on_list_delete_cancel(callback: types.CallbackQuery, db=None):
+    # vx:{ctx_short}:{ctx_id}:{offset}
     parts = callback.data.split(":")
     ctx_short = parts[1]
     ctx_id = parts[2]
