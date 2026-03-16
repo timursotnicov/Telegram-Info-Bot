@@ -723,9 +723,9 @@ async def cmd_tags(message: types.Message, db=None):
 # ── /search ───────────────────────────────────────────────
 
 @router.message(Command("search"))
-async def cmd_search(message: types.Message, db=None):
+async def cmd_search(message: types.Message, db=None, query_override: str | None = None):
     user_id = message.from_user.id
-    query = message.text.replace("/search", "", 1).strip()
+    query = query_override or message.text.replace("/search", "", 1).strip()
     if not query:
         await message.reply("Использование: /search <запрос>")
         return

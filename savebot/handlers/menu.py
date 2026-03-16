@@ -37,9 +37,7 @@ async def state_dispatcher(message: types.Message, db=None):
         logger.info("State dispatcher: found search_prompt state for user %d", user_id)
         await delete_state(db, f"search_prompt_{user_id}")
         from savebot.handlers.browse import cmd_search
-        # Fake the message text to look like /search <query>
-        message.text = f"/search {text}"
-        await cmd_search(message, db=db)
+        await cmd_search(message, db=db, query_override=text)
         return
 
     # Check rename_cat state
