@@ -565,6 +565,98 @@ async def get_similar_items_fts(db: aiosqlite.Connection, user_id: int, item_id:
     return await _attach_tags(db, items)
 
 
+# ── Collections ───────────────────────────────────────────
+
+async def create_collection(db: aiosqlite.Connection, user_id: int, name: str, emoji: str = "\U0001f4c1") -> dict:
+    """Create a new collection for the user."""
+    cursor = await db.execute(
+        "INSERT INTO collections (user_id, name, emoji) VALUES (?, ?, ?)",
+        (user_id, name, emoji),
+    )
+    await db.commit()
+    return {"id": cursor.lastrowid, "name": name, "user_id": user_id, "emoji": emoji}
+
+
+async def get_collections(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Get all collections for the user with item counts."""
+    cursor = await db.execute(
+        """SELECT c.*, COUNT(ci.item_id) as item_count
+           FROM collections c
+           LEFT JOIN collection_items ci ON ci.collection_id = c.id
+           WHERE c.user_id = ?
+           GROUP BY c.id
+           ORDER BY c.created_at DESC""",
+        (user_id,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_collection_items(
+    db: aiosqlite.Connection, user_id: int, collection_id: int, limit: int = 5, offset: int = 0
+) -> list[dict]:
+    """Get items in a collection with tags attached."""
+    cursor = await db.execute(
+        """SELECT i.* FROM items i
+           JOIN collection_items ci ON ci.item_id = i.id
+           WHERE ci.collection_id = ? AND i.user_id = ?
+           ORDER BY ci.added_at DESC LIMIT ? OFFSET ?""",
+        (collection_id, user_id, limit, offset),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+async def add_to_collection(db: aiosqlite.Connection, user_id: int, collection_id: int, item_id: int) -> bool:
+    """Add an item to a collection. Returns False if already in collection."""
+    # Verify both belong to user
+    coll = await db.execute(
+        "SELECT id FROM collections WHERE id = ? AND user_id = ?", (collection_id, user_id)
+    )
+    if not await coll.fetchone():
+        return False
+    item = await db.execute(
+        "SELECT id FROM items WHERE id = ? AND user_id = ?", (item_id, user_id)
+    )
+    if not await item.fetchone():
+        return False
+
+    try:
+        await db.execute(
+            "INSERT INTO collection_items (collection_id, item_id) VALUES (?, ?)",
+            (collection_id, item_id),
+        )
+        await db.commit()
+        return True
+    except Exception:
+        return False
+
+
+async def remove_from_collection(db: aiosqlite.Connection, user_id: int, collection_id: int, item_id: int) -> bool:
+    """Remove an item from a collection."""
+    # Verify collection belongs to user
+    coll = await db.execute(
+        "SELECT id FROM collections WHERE id = ? AND user_id = ?", (collection_id, user_id)
+    )
+    if not await coll.fetchone():
+        return False
+
+    cursor = await db.execute(
+        "DELETE FROM collection_items WHERE collection_id = ? AND item_id = ?",
+        (collection_id, item_id),
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
+async def delete_collection(db: aiosqlite.Connection, user_id: int, collection_id: int) -> bool:
+    """Delete a collection (items themselves are not deleted)."""
+    cursor = await db.execute(
+        "DELETE FROM collections WHERE id = ? AND user_id = ?", (collection_id, user_id)
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
 # ── Navigation ─────────────────────────────────────────────
 
 def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, list, str]:

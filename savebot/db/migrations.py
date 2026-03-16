@@ -34,6 +34,31 @@ MIGRATIONS = [
     """
     ALTER TABLE items ADD COLUMN user_note TEXT;
     """,
+    # Migration 9: Collections tables
+    """
+    CREATE TABLE IF NOT EXISTS collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        emoji TEXT DEFAULT '📁',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, name)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS collection_items (
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (collection_id, item_id)
+    );
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_collection_items_coll ON collection_items(collection_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_collection_items_item ON collection_items(item_id);
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):

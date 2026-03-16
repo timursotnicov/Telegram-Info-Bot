@@ -327,3 +327,114 @@ async def test_get_similar_items_fts_user_isolation(db):
     similar = await queries.get_similar_items_fts(db, USER_ID, item1, limit=5)
     for r in similar:
         assert r["user_id"] == USER_ID
+
+
+# ── Collections ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_create_and_get_collections(db):
+    coll = await queries.create_collection(db, USER_ID, "Favorites", "⭐")
+    assert coll["name"] == "Favorites"
+    assert coll["id"] is not None
+
+    colls = await queries.get_collections(db, USER_ID)
+    assert len(colls) == 1
+    assert colls[0]["name"] == "Favorites"
+    assert colls[0]["item_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_add_and_get_collection_items(db):
+    coll = await queries.create_collection(db, USER_ID, "Reading", "📖")
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    item_id = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Article", tags=["read"],
+    )
+
+    assert await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+
+    items = await queries.get_collection_items(db, USER_ID, coll["id"])
+    assert len(items) == 1
+    assert items[0]["id"] == item_id
+    assert "tags" in items[0]
+
+    # item_count should update
+    colls = await queries.get_collections(db, USER_ID)
+    assert colls[0]["item_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_add_to_collection_duplicate(db):
+    coll = await queries.create_collection(db, USER_ID, "Dupes", "📁")
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    item_id = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Item", tags=[],
+    )
+
+    assert await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+    # Second add should return False (duplicate)
+    assert not await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+
+
+@pytest.mark.asyncio
+async def test_remove_from_collection(db):
+    coll = await queries.create_collection(db, USER_ID, "Temp", "📁")
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    item_id = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Removable", tags=[],
+    )
+
+    await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+    assert await queries.remove_from_collection(db, USER_ID, coll["id"], item_id)
+
+    items = await queries.get_collection_items(db, USER_ID, coll["id"])
+    assert len(items) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_collection(db):
+    coll = await queries.create_collection(db, USER_ID, "ToDelete", "📁")
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    item_id = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Kept item", tags=[],
+    )
+    await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+
+    assert await queries.delete_collection(db, USER_ID, coll["id"])
+
+    colls = await queries.get_collections(db, USER_ID)
+    assert len(colls) == 0
+
+    # Item itself still exists
+    item = await queries.get_item(db, USER_ID, item_id)
+    assert item is not None
+
+
+@pytest.mark.asyncio
+async def test_collection_user_isolation(db):
+    coll = await queries.create_collection(db, USER_ID, "Private", "🔒")
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    item_id = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Secret", tags=[],
+    )
+    await queries.add_to_collection(db, USER_ID, coll["id"], item_id)
+
+    # Other user can't see collections
+    colls = await queries.get_collections(db, OTHER_USER)
+    assert len(colls) == 0
+
+    # Other user can't add to this collection
+    cat2 = await queries.get_or_create_category(db, OTHER_USER, "Test", "\U0001f4c1")
+    item2 = await queries.save_item(
+        db, OTHER_USER, category_id=cat2["id"],
+        content_type="text", content_text="Other", tags=[],
+    )
+    assert not await queries.add_to_collection(db, OTHER_USER, coll["id"], item2)
+
+    # Other user can't delete this collection
+    assert not await queries.delete_collection(db, OTHER_USER, coll["id"])
