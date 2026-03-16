@@ -33,7 +33,7 @@ async def state_dispatcher(message: types.Message, db=None):
 
     # Check search prompt state
     state = await get_state(db, f"search_prompt_{user_id}")
-    if state:
+    if state is not None:
         logger.info("State dispatcher: found search_prompt state for user %d", user_id)
         await delete_state(db, f"search_prompt_{user_id}")
         from savebot.handlers.browse import cmd_search
@@ -44,7 +44,7 @@ async def state_dispatcher(message: types.Message, db=None):
 
     # Check rename_cat state
     state = await get_state(db, f"rename_cat_{user_id}")
-    if state:
+    if state is not None:
         logger.info("State dispatcher: found rename_cat state for user %d", user_id)
         await delete_state(db, f"rename_cat_{user_id}")
         cat_id = state["cat_id"]
@@ -57,7 +57,7 @@ async def state_dispatcher(message: types.Message, db=None):
 
     # Check awaiting_cat state (manual save flow — user typing new category name)
     state = await get_state(db, f"awaiting_{user_id}")
-    if state:
+    if state is not None:
         logger.info("State dispatcher: found awaiting_cat state for user %d", user_id)
         pending_key = state["pending_key"]
         pending = await get_state(db, pending_key)
@@ -85,7 +85,7 @@ async def state_dispatcher(message: types.Message, db=None):
 
     # Check new_browse_cat state (creating category from browse hub)
     state = await get_state(db, f"new_browse_cat_{user_id}")
-    if state:
+    if state is not None:
         logger.info("State dispatcher: found new_browse_cat state for user %d", user_id)
         await delete_state(db, f"new_browse_cat_{user_id}")
         try:
@@ -97,7 +97,7 @@ async def state_dispatcher(message: types.Message, db=None):
 
     # Check edit_tags state
     state = await get_state(db, f"edit_tags_{user_id}")
-    if state:
+    if state is not None:
         logger.info("State dispatcher: found edit_tags state for user %d", user_id)
         await delete_state(db, f"edit_tags_{user_id}")
         item_id = state["item_id"]
