@@ -59,6 +59,13 @@ MIGRATIONS = [
     """
     CREATE INDEX IF NOT EXISTS idx_collection_items_item ON collection_items(item_id);
     """,
+    # Migration 13: Add daily_brief columns to user_preferences
+    """
+    ALTER TABLE user_preferences ADD COLUMN daily_brief_enabled INTEGER DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_preferences ADD COLUMN daily_brief_time TEXT DEFAULT '09:00';
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):

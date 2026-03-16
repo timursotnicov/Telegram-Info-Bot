@@ -438,3 +438,121 @@ async def test_collection_user_isolation(db):
 
     # Other user can't delete this collection
     assert not await queries.delete_collection(db, OTHER_USER, coll["id"])
+
+
+# ── Daily Brief ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_items_saved_yesterday(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Recent item", tags=["daily"],
+    )
+    # Insert an old item manually
+    await db.execute(
+        """INSERT INTO items (category_id, content_type, content_text, user_id, created_at)
+           VALUES (?, 'text', 'Old item', ?, datetime('now', '-3 days'))""",
+        (cat["id"], USER_ID),
+    )
+    await db.commit()
+
+    items = await queries.get_items_saved_yesterday(db, USER_ID)
+    texts = [i["content_text"] for i in items]
+    assert "Recent item" in texts
+    assert "Old item" not in texts
+    # Tags attached
+    for item in items:
+        assert "tags" in item
+
+
+@pytest.mark.asyncio
+async def test_get_items_on_this_day(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
+    # Insert item on same month+day but last year
+    await db.execute(
+        """INSERT INTO items (category_id, content_type, content_text, user_id, created_at)
+           VALUES (?, 'text', 'Anniversary item', ?, datetime('now', '-1 year'))""",
+        (cat["id"], USER_ID),
+    )
+    # Insert item on a different day last year
+    await db.execute(
+        """INSERT INTO items (category_id, content_type, content_text, user_id, created_at)
+           VALUES (?, 'text', 'Different day item', ?, datetime('now', '-1 year', '+5 days'))""",
+        (cat["id"], USER_ID),
+    )
+    await db.commit()
+
+    items = await queries.get_items_on_this_day(db, USER_ID)
+    texts = [i["content_text"] for i in items]
+    assert "Anniversary item" in texts
+    assert "Different day item" not in texts
+
+
+@pytest.mark.asyncio
+async def test_get_weekly_category_stats(db):
+    cat1 = await queries.get_or_create_category(db, USER_ID, "Work", "💼")
+    cat2 = await queries.get_or_create_category(db, USER_ID, "Fun", "🎮")
+    for _ in range(3):
+        await queries.save_item(
+            db, USER_ID, category_id=cat1["id"],
+            content_type="text", content_text="Work item", tags=[],
+        )
+    await queries.save_item(
+        db, USER_ID, category_id=cat2["id"],
+        content_type="text", content_text="Fun item", tags=[],
+    )
+
+    stats = await queries.get_weekly_category_stats(db, USER_ID)
+    assert len(stats) == 2
+    assert stats[0]["name"] == "Work"
+    assert stats[0]["count"] == 3
+    assert stats[1]["name"] == "Fun"
+    assert stats[1]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_get_inbox_count(db):
+    inbox = await queries.get_or_create_inbox_category(db, USER_ID)
+    other = await queries.get_or_create_category(db, USER_ID, "Other", "\U0001f4c1")
+    await queries.save_item(
+        db, USER_ID, category_id=inbox["id"],
+        content_type="text", content_text="Inbox item 1", tags=[],
+    )
+    await queries.save_item(
+        db, USER_ID, category_id=inbox["id"],
+        content_type="text", content_text="Inbox item 2", tags=[],
+    )
+    await queries.save_item(
+        db, USER_ID, category_id=other["id"],
+        content_type="text", content_text="Not inbox", tags=[],
+    )
+
+    count = await queries.get_inbox_count(db, USER_ID)
+    assert count == 2
+
+
+@pytest.mark.asyncio
+async def test_daily_brief_preferences(db):
+    prefs = await queries.get_user_preferences(db, USER_ID)
+    assert prefs["daily_brief_enabled"] == 0
+    assert prefs["daily_brief_time"] == "09:00"
+
+    await queries.update_user_preference(db, USER_ID, "daily_brief_enabled", 1)
+    await queries.update_user_preference(db, USER_ID, "daily_brief_time", "08:00")
+    prefs = await queries.get_user_preferences(db, USER_ID)
+    assert prefs["daily_brief_enabled"] == 1
+    assert prefs["daily_brief_time"] == "08:00"
+
+
+@pytest.mark.asyncio
+async def test_get_all_users_with_daily_brief(db):
+    # No users initially
+    users = await queries.get_all_users_with_daily_brief(db)
+    assert len(users) == 0
+
+    # Enable for USER_ID
+    await queries.update_user_preference(db, USER_ID, "daily_brief_enabled", 1)
+    users = await queries.get_all_users_with_daily_brief(db)
+    assert len(users) == 1
+    assert users[0]["user_id"] == USER_ID

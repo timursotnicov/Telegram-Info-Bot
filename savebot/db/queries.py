@@ -10,7 +10,7 @@ import aiosqlite
 
 # ── Allowed preference keys (whitelist for SQL injection prevention) ──
 
-_ALLOWED_PREF_KEYS = {"auto_save", "digest_enabled", "digest_day", "digest_time", "language"}
+_ALLOWED_PREF_KEYS = {"auto_save", "digest_enabled", "digest_day", "digest_time", "language", "daily_brief_enabled", "daily_brief_time"}
 
 
 # ── Helper ─────────────────────────────────────────────────
@@ -283,7 +283,7 @@ async def get_user_preferences(db: aiosqlite.Connection, user_id: int) -> dict:
         "INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)", (user_id,)
     )
     await db.commit()
-    return {"user_id": user_id, "auto_save": 1, "digest_enabled": 1, "digest_day": 1, "digest_time": "10:00", "language": "ru"}
+    return {"user_id": user_id, "auto_save": 1, "digest_enabled": 1, "digest_day": 1, "digest_time": "10:00", "language": "ru", "daily_brief_enabled": 0, "daily_brief_time": "09:00"}
 
 
 async def update_user_preference(db: aiosqlite.Connection, user_id: int, key: str, value: Any):
@@ -786,3 +786,66 @@ async def create_category_manual(
     )
     await db.commit()
     return {"id": cursor.lastrowid, "name": name, "user_id": user_id, "emoji": emoji}
+
+
+# ── Daily Brief ────────────────────────────────────────────
+
+async def get_items_saved_yesterday(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Items saved in the last 24 hours."""
+    cursor = await db.execute(
+        """SELECT i.*, c.name AS category_name, c.emoji AS category_emoji
+           FROM items i LEFT JOIN categories c ON c.id = i.category_id
+           WHERE i.user_id = ? AND i.created_at >= datetime('now', '-1 day')
+           ORDER BY i.created_at DESC""",
+        (user_id,),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+async def get_items_on_this_day(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Items saved on the same month+day in previous years (anniversary items)."""
+    cursor = await db.execute(
+        """SELECT i.*, c.name AS category_name, c.emoji AS category_emoji
+           FROM items i LEFT JOIN categories c ON c.id = i.category_id
+           WHERE i.user_id = ?
+             AND strftime('%m-%d', i.created_at) = strftime('%m-%d', 'now')
+             AND strftime('%Y', i.created_at) < strftime('%Y', 'now')
+           ORDER BY i.created_at DESC""",
+        (user_id,),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
+
+
+async def get_weekly_category_stats(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Categories with most new items this week, returns list of {name, emoji, count}."""
+    cursor = await db.execute(
+        """SELECT c.name, c.emoji, COUNT(i.id) AS count
+           FROM items i
+           JOIN categories c ON c.id = i.category_id
+           WHERE i.user_id = ? AND i.created_at >= datetime('now', '-7 days')
+           GROUP BY c.id
+           ORDER BY count DESC""",
+        (user_id,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_inbox_count(db: aiosqlite.Connection, user_id: int) -> int:
+    """Count of items in the Inbox category."""
+    cursor = await db.execute(
+        """SELECT COUNT(*) AS c FROM items i
+           JOIN categories cat ON cat.id = i.category_id
+           WHERE i.user_id = ? AND cat.name = 'Inbox' AND cat.user_id = ?""",
+        (user_id, user_id),
+    )
+    return (await cursor.fetchone())["c"]
+
+
+async def get_all_users_with_daily_brief(db: aiosqlite.Connection) -> list[dict]:
+    """Get all users who have daily brief enabled."""
+    cursor = await db.execute(
+        "SELECT * FROM user_preferences WHERE daily_brief_enabled = 1"
+    )
+    return [dict(r) for r in await cursor.fetchall()]
