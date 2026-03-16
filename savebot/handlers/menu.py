@@ -100,7 +100,7 @@ async def state_dispatcher(message: types.Message, db=None):
         await delete_state(db, f"edit_tags_{user_id}")
         item_id = state["item_id"]
         # Parse tags: split by space/comma, strip #, lowercase
-        new_tags = [t.strip().strip("#").lower() for t in text.replace(",", " ").split() if t.strip()]
+        new_tags = [t.strip().strip("#").lower().replace("-", "_") for t in text.replace(",", " ").split() if t.strip()]
         if new_tags:
             await queries.update_item_tags(db, user_id, item_id, new_tags)
             tags_str = " ".join(f"#{t}" for t in new_tags)

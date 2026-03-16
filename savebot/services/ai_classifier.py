@@ -117,7 +117,7 @@ async def classify_content(
             return {
                 "category": result.get("category", "Inbox"),
                 "emoji": result.get("emoji", "📁"),
-                "tags": result.get("tags", [])[:3],
+                "tags": [t.replace("-", "_") for t in result.get("tags", [])[:3]],
                 "summary": result.get("summary", ""),
             }
         except asyncio.TimeoutError:
