@@ -60,7 +60,7 @@ async def _example_state_check(message, db, user_id, text):
 # ── Step 3: Stale state cleanup in handle_keyboard_button ─
 # At the top of handle_keyboard_button, clear ALL known state prefixes:
 
-STATE_PREFIXES = ("search_prompt_", "rename_cat_", "new_browse_cat_", "awaiting_", "edit_tags_")
+STATE_PREFIXES = ("search_prompt_", "rename_cat_", "new_browse_cat_", "new_collection_", "awaiting_", "edit_tags_", "edit_note_")
 
 
 async def _cleanup_stale_states(db, user_id):

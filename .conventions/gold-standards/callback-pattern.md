@@ -12,12 +12,13 @@ Use 2-3 character prefixes + colon separator:
 | `vi:` | View item (single) | `vi:c:5:42` |
 | `vn:` | View navigate (prev/next) | `vn:c:5:43` |
 | `vl:` | View list (paginate) | `vl:c:5:10` |
-| `va:` | View action (on item) | `va:pin:42`, `va:del:42`, `va:tags:42` |
+| `va:` | View action (on item) | `va:pin:42`, `va:del:42`, `va:tags:42`, `va:rel:42`, `va:coll:42` |
 | `vd:` | View delete (initiate from list) | `vd:c:5:42:0` |
 | `vy:` | View delete yes (confirm) | `vy:c:5:42:0` |
 | `vx:` | View delete cancel | `vx:c:5:0` |
 | `browse_cat:` | Category items list | `browse_cat:5:0` |
 | `tag_items:` | Tag items list | `tag_items:ai:0` |
+| `bc:` | Browse collection items | `bc:3:0` |
 | `settings_*` | Settings toggles | `settings_toggle:auto_save` |
 | `save_*` | Save flow actions | `save_confirm:key123` |
 
@@ -32,6 +33,7 @@ For navigation callbacks (`vi:`, `vn:`, `vl:`), the second segment is a context:
 | `p` | pinned | `0` (unused) |
 | `l` | readlist | `0` (unused) |
 | `f` | forgotten | `0` (unused) |
+| `o` | collection | collection ID (int) |
 
 ## Pattern
 ```
@@ -43,6 +45,10 @@ Examples:
 - `vn:t:ai:43` — navigate to item #43 in tag "ai"
 - `vl:r:0:10` — recent list, offset 10
 - `va:mc:42:5` — move item #42 to category 5
+- `va:rel:42` — show related items for item #42
+- `va:coll:42` — show collection picker for item #42
+- `va:ac:42:3` — add item #42 to collection 3
+- `va:nc:42` — create new collection and add item #42
 
 ## Tag Truncation
 Tags in callback data are truncated to 20 characters using `_truncate_tag()`.
@@ -81,4 +87,6 @@ to the correct list page after completing.
 - `noop` — placeholder for non-interactive buttons (e.g., page counter)
 - `bm:cats` — return to category list (main browse screen)
 - `tags_back` — return to tag cloud
-- `bm:hub` — open "More" menu (map, forgotten, new category)
+- `bm:hub` — open "More" menu (map, forgotten, new category, collections)
+- `bm:colls` — open collections list
+- `bm:newcoll` — create new collection prompt
