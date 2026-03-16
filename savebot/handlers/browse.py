@@ -341,7 +341,7 @@ async def on_hub_map(callback: types.CallbackQuery, db=None):
 
 @router.callback_query(F.data == "bm:forg")
 async def on_hub_forgotten(callback: types.CallbackQuery, db=None):
-    await _show_list(callback, "forgotten", "0", 0)
+    await _show_list(callback, "forgotten", "0", 0, db=db)
 
 
 # ── Hub: New Category ─────────────────────────────────────
@@ -914,6 +914,8 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
         await message.reply("Использование: /search &lt;запрос&gt;")
         return
 
+    wait_msg = await message.reply("⏳ Ищу...")
+
     # Try AI-powered search first
     parsed = await parse_search_query(query)
     items = None
@@ -956,7 +958,7 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
         search_info = ""  # Don't show AI info for fallback
 
     if not items:
-        await message.reply(f"🔍 По запросу «{query}» ничего не найдено.")
+        await wait_msg.edit_text(f"🔍 По запросу «{query}» ничего не найдено.")
         return
 
     # Build clickable search results
@@ -969,7 +971,7 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
             callback_data=f"vi:r:0:{item['id']}",
         )])
 
-    await message.reply(
+    await wait_msg.edit_text(
         text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
@@ -990,6 +992,8 @@ async def cmd_ask(message: types.Message, db=None):
         )
         return
 
+    wait_msg = await message.reply("🤔 Думаю...")
+
     # Find relevant items
     parsed = await parse_search_query(question)
     items = None
@@ -1005,7 +1009,7 @@ async def cmd_ask(message: types.Message, db=None):
         items = await queries.search_items(db, user_id, fallback_query, limit=15)
 
     if not items:
-        await message.reply("🤔 Не нашёл подходящих записей в твоей базе знаний.")
+        await wait_msg.edit_text("🤔 Не нашёл подходящих записей в твоей базе знаний.")
         return
 
     # Synthesize answer
@@ -1022,7 +1026,14 @@ async def cmd_ask(message: types.Message, db=None):
         text = "🔍 Не удалось сформировать ответ, но вот подходящие записи:\n\n"
         text += "\n\n".join(_format_item(item) for item in items[:10])
 
-    await message.reply(text, parse_mode="HTML")
+    buttons = []
+    for i, item in enumerate(items[:5], 1):
+        title = _format_item_short(item)
+        buttons.append([InlineKeyboardButton(
+            text=f"{i}. {title}",
+            callback_data=f"vi:r:0:{item['id']}",
+        )])
+    await wait_msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
 
 
 # ── /recent (clickable) ──────────────────────────────────

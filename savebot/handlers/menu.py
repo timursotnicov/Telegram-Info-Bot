@@ -10,6 +10,7 @@ import logging
 
 from aiogram import F, Router, types
 from aiogram.filters import Command
+from aiogram.types import ForceReply
 
 from savebot.db import queries
 from savebot.db.state_store import get_state, set_state, delete_state
@@ -133,7 +134,10 @@ async def handle_keyboard_button(message: types.Message, db=None):
     elif text == "🔍 Search":
         user_id = message.from_user.id
         await set_state(db, f"search_prompt_{user_id}", user_id, "search_prompt", {})
-        await message.reply("🔍 Введите поисковый запрос:")
+        await message.reply(
+            "🔍 Введите поисковый запрос:",
+            reply_markup=ForceReply(input_field_placeholder="Поиск..."),
+        )
 
     elif text == "📌 Pinned":
         from savebot.handlers.browse import cmd_pinned
