@@ -8,7 +8,7 @@ Use 2-3 character prefixes + colon separator:
 
 | Prefix | Meaning | Example |
 |--------|---------|---------|
-| `bm:` | Browse menu hub | `bm:cats`, `bm:tags`, `bm:map` |
+| `bm:` | Browse menu (cats, tags, more) | `bm:cats`, `bm:tags`, `bm:hub` |
 | `vi:` | View item (single) | `vi:c:5:42` |
 | `vn:` | View navigate (prev/next) | `vn:c:5:43` |
 | `vl:` | View list (paginate) | `vl:c:5:10` |
@@ -79,6 +79,6 @@ to the correct list page after completing.
 
 ## Static Callbacks
 - `noop` — placeholder for non-interactive buttons (e.g., page counter)
-- `browse_back` — return to category list
+- `bm:cats` — return to category list (main browse screen)
 - `tags_back` — return to tag cloud
-- `bm:hub` — return to browse hub
+- `bm:hub` — open "More" menu (map, forgotten, new category)
