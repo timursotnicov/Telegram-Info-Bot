@@ -12,7 +12,7 @@ import aiosqlite
 
 from savebot.db import queries
 from savebot.db.state_store import cleanup_expired
-from savebot.services.digest import generate_weekly_digest
+from savebot.services.digest import generate_weekly_digest, send_daily_brief
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,30 @@ async def _send_digests(bot: Bot, db_path: str):
         await db.close()
 
 
+async def _check_daily_briefs(bot: Bot, db_path: str):
+    """Send daily briefs to users whose chosen time matches the current hour."""
+    import datetime
+    current_hour = datetime.datetime.now().strftime("%H:00")
+
+    db = await aiosqlite.connect(db_path)
+    db.row_factory = aiosqlite.Row
+    try:
+        users = await queries.get_all_users_with_daily_brief(db)
+        for user_pref in users:
+            user_time = user_pref.get("daily_brief_time", "09:00")
+            # Compare HH:00 with the user's chosen HH:MM (match on hour)
+            if user_time[:2] != current_hour[:2]:
+                continue
+
+            user_id = user_pref["user_id"]
+            try:
+                await send_daily_brief(bot, db, user_id)
+            except Exception as e:
+                logger.error("Failed to send daily brief to user %s: %s", user_id, e)
+    finally:
+        await db.close()
+
+
 async def _cleanup_states(db_path: str):
     """Clean up expired pending states."""
     db = await aiosqlite.connect(db_path)
@@ -70,6 +94,15 @@ def start_scheduler(bot: Bot, db_path: str):
         CronTrigger(hour=10, minute=0),
         args=[bot, db_path],
         id="daily_digest_check",
+        replace_existing=True,
+    )
+
+    # Hourly check for daily briefs — sends to users whose chosen hour matches
+    _scheduler.add_job(
+        _check_daily_briefs,
+        CronTrigger(minute=0),
+        args=[bot, db_path],
+        id="daily_brief_check",
         replace_existing=True,
     )
 
