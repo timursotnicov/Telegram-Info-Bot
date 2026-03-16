@@ -13,6 +13,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from savebot.db import queries
 from savebot.db.state_store import set_state
 from savebot.services.ai_search import parse_search_query, synthesize_answer
+from savebot.services.connections import find_related_items
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -601,19 +602,21 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     if item.get("forward_url"):
         buttons.append([InlineKeyboardButton(text="📨 Оригинал", url=item["forward_url"])])
 
-    # Action row 2: tags, note, mark read, back to list
+    # Action row 2: tags, note, related, mark read
     actions2 = []
     actions2.append(InlineKeyboardButton(text="🏷 Теги", callback_data=f"va:tags:{item_id}"))
     actions2.append(InlineKeyboardButton(text="✏️ Заметка", callback_data=f"va:note:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="🔗 Похожие", callback_data=f"va:rel:{item_id}"))
     if not item.get("is_read"):
         actions2.append(InlineKeyboardButton(text="✅ Прочитано", callback_data=f"va:read:{item_id}"))
-    # Back to list
+    buttons.append(actions2)
+
+    # Back to list row
     back_offset = max(0, ((position - 1) // PAGE_SIZE) * PAGE_SIZE) if position else 0
-    actions2.append(InlineKeyboardButton(
+    buttons.append([InlineKeyboardButton(
         text="🔙 К списку",
         callback_data=f"vl:{ctx_short}:{ctx_id}:{back_offset}",
-    ))
-    buttons.append(actions2)
+    )])
 
     await callback.message.edit_text(
         text,
@@ -894,6 +897,47 @@ async def on_action_note(callback: types.CallbackQuery, db=None):
     await callback.message.edit_text(
         f"💭 <b>Текущая заметка:</b> {html.escape(current)}\n\n"
         f"✏️ Введите заметку:",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("va:rel:"))
+async def on_action_related(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    item_id = int(callback.data.split(":")[2])
+
+    item = await queries.get_item(db, user_id, item_id)
+    if not item:
+        await callback.answer("Запись не найдена.")
+        return
+
+    related = await find_related_items(
+        db, item_id, user_id,
+        category_id=item.get("category_id"),
+        tags=item.get("tags", []),
+        source=item.get("source"),
+    )
+
+    if not related:
+        await callback.answer("Похожих записей не найдено", show_alert=False)
+        return
+
+    lines = ["🔗 <b>Похожие записи:</b>\n"]
+    buttons = []
+    for r in related:
+        title = _format_item_short(r)
+        lines.append(f"• <b>#{r['id']}</b> {html.escape(title)}")
+        buttons.append([InlineKeyboardButton(
+            text=f"#{r['id']} {title}",
+            callback_data=f"vi:r:0:{r['id']}",
+        )])
+
+    buttons.append([InlineKeyboardButton(text="🔙 К записи", callback_data=f"vi:r:0:{item_id}")])
+
+    await callback.message.edit_text(
+        "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
     await callback.answer()
