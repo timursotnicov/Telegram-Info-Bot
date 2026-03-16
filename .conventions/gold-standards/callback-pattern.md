@@ -19,7 +19,8 @@ Use 2-3 character prefixes + colon separator:
 | `browse_cat:` | Category items list | `browse_cat:5:0` |
 | `tag_items:` | Tag items list | `tag_items:ai:0` |
 | `bc:` | Browse collection items | `bc:3:0` |
-| `settings_*` | Settings toggles | `settings_toggle:auto_save` |
+| `settings_*` | Settings toggles | `settings_toggle:auto_save`, `settings_toggle:daily_brief_enabled` |
+| `settings_brief_time:` | Daily brief time picker | `settings_brief_time:09:00` |
 | `save_*` | Save flow actions | `save_confirm:key123` |
 
 ## Context Short Codes
@@ -90,3 +91,5 @@ to the correct list page after completing.
 - `bm:hub` — open "More" menu (map, forgotten, new category, collections)
 - `bm:colls` — open collections list
 - `bm:newcoll` — create new collection prompt
+- `settings_brief_time` — open daily brief time picker
+- `settings_brief_time:{HH:MM}` — set daily brief time
