@@ -37,6 +37,11 @@ async def get_or_create_category(db: aiosqlite.Connection, user_id: int, name: s
     return {"id": cursor.lastrowid, "name": name, "user_id": user_id, "emoji": emoji}
 
 
+async def get_or_create_inbox_category(db: aiosqlite.Connection, user_id: int) -> dict:
+    """Get or create the special 'Inbox' category for quick capture."""
+    return await get_or_create_category(db, user_id, "Inbox", "📥")
+
+
 async def get_all_categories(db: aiosqlite.Connection, user_id: int) -> list[dict]:
     cursor = await db.execute(
         """SELECT c.*, COUNT(i.id) as item_count

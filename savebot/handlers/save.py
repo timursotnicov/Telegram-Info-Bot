@@ -119,9 +119,37 @@ async def _detect_content(message: types.Message):
     return content_type, content_text, url, file_id, source, forward_url
 
 
+async def _quick_capture(message: types.Message, db) -> bool:
+    """Handle '!' prefix — save to Inbox without AI. Returns True if handled."""
+    if not message.text or not message.text.startswith("!"):
+        return False
+
+    text = message.text[1:].strip()
+    if not text:
+        return False
+
+    user_id = message.from_user.id
+    inbox = await queries.get_or_create_inbox_category(db, user_id)
+    await queries.save_item(
+        db, user_id,
+        category_id=inbox["id"],
+        content_type="text",
+        content_text=text,
+        tags=[],
+        ai_summary=text[:100],
+    )
+    await message.reply("✅ Сохранено в 📥 Inbox")
+    return True
+
+
 async def _process_content(message: types.Message, db):
     """Process incoming content — auto-save or manual mode."""
     user_id = message.from_user.id
+
+    # Quick capture: '!' prefix saves to Inbox without AI
+    if await _quick_capture(message, db):
+        return
+
     content_type, content_text, url, file_id, source, forward_url = await _detect_content(message)
 
     # Check for duplicates
