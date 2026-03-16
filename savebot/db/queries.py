@@ -194,6 +194,14 @@ async def update_item_tags(db: aiosqlite.Connection, user_id: int, item_id: int,
     await db.commit()
 
 
+async def update_item_note(db: aiosqlite.Connection, user_id: int, item_id: int, note: str) -> bool:
+    cursor = await db.execute(
+        "UPDATE items SET user_note = ? WHERE id = ? AND user_id = ?", (note, item_id, user_id)
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
 async def delete_item(db: aiosqlite.Connection, user_id: int, item_id: int) -> bool:
     cursor = await db.execute("DELETE FROM items WHERE id = ? AND user_id = ?", (item_id, user_id))
     await db.commit()

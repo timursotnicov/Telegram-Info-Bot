@@ -80,6 +80,10 @@ def _format_item_full(item: dict, position: int | None = None, total: int | None
     if tags:
         parts.append("\n" + " ".join(f"#{t}" for t in tags))
 
+    # Personal note
+    if item.get("user_note"):
+        parts.append(f"\n💭 {html.escape(item['user_note'])}")
+
     # Source (for forwards)
     if item.get("source"):
         parts.append(f"\n📨 Переслано из: {html.escape(item['source'])}")
@@ -597,9 +601,10 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     if item.get("forward_url"):
         buttons.append([InlineKeyboardButton(text="📨 Оригинал", url=item["forward_url"])])
 
-    # Action row 2: tags, mark read, back to list
+    # Action row 2: tags, note, mark read, back to list
     actions2 = []
     actions2.append(InlineKeyboardButton(text="🏷 Теги", callback_data=f"va:tags:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="✏️ Заметка", callback_data=f"va:note:{item_id}"))
     if not item.get("is_read"):
         actions2.append(InlineKeyboardButton(text="✅ Прочитано", callback_data=f"va:read:{item_id}"))
     # Back to list
@@ -873,6 +878,27 @@ async def on_action_tags(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("va:note:"))
+async def on_action_note(callback: types.CallbackQuery, db=None):
+    item_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+
+    item = await queries.get_item(db, user_id, item_id)
+    if not item:
+        await callback.answer("Запись не найдена.")
+        return
+
+    current = item.get("user_note") or "нет заметки"
+
+    await set_state(db, f"edit_note_{user_id}", user_id, "edit_note", {"item_id": item_id})
+    await callback.message.edit_text(
+        f"💭 <b>Текущая заметка:</b> {html.escape(current)}\n\n"
+        f"✏️ Введите заметку:",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
 # ── Legacy /tags command ──────────────────────────────────
 
 @router.message(Command("tags"))
@@ -1027,12 +1053,15 @@ async def cmd_ask(message: types.Message, db=None):
         text += "\n\n".join(_format_item(item) for item in items[:10])
 
     buttons = []
-    for i, item in enumerate(items[:5], 1):
+    shown_items = items[:10]
+    for i, item in enumerate(shown_items, 1):
         title = _format_item_short(item)
         buttons.append([InlineKeyboardButton(
             text=f"{i}. {title}",
             callback_data=f"vi:r:0:{item['id']}",
         )])
+    if len(items) > 10:
+        text += f"\n<i>(и ещё {len(items) - 10} записей)</i>"
     await wait_msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
 
 

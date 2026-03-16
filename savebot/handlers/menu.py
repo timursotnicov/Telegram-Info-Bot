@@ -110,6 +110,16 @@ async def state_dispatcher(message: types.Message, db=None):
             await message.reply("⚠️ Введите хотя бы один тег.")
         return
 
+    # Check edit_note state
+    state = await get_state(db, f"edit_note_{user_id}")
+    if state is not None:
+        logger.info("State dispatcher: found edit_note state for user %d", user_id)
+        await delete_state(db, f"edit_note_{user_id}")
+        item_id = state["item_id"]
+        await queries.update_item_note(db, user_id, item_id, text)
+        await message.reply("✅ Заметка сохранена")
+        return
+
     # No state matched — let save.py catch it as content to save
     logger.info("State dispatcher: no state found for user %d, skipping to save handler", user_id)
     from aiogram.dispatcher.event.bases import SkipHandler
@@ -122,7 +132,7 @@ async def state_dispatcher(message: types.Message, db=None):
 async def handle_keyboard_button(message: types.Message, db=None):
     # Clear any pending states when user presses a keyboard button
     user_id = message.from_user.id
-    for prefix in ("search_prompt_", "rename_cat_", "new_browse_cat_", "awaiting_", "edit_tags_"):
+    for prefix in ("search_prompt_", "rename_cat_", "new_browse_cat_", "awaiting_", "edit_tags_", "edit_note_"):
         await delete_state(db, f"{prefix}{user_id}")
 
     text = message.text

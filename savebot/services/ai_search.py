@@ -38,9 +38,10 @@ Answer the user's question using ONLY the saved items provided below. Do NOT inv
 
 Rules:
 1. Reference items by ID: (см. #42, #17) or (see #42, #17).
-2. If items don't have enough info — say so honestly, don't guess.
-3. Keep answer concise: 3-5 sentences.
-4. Answer in the SAME language as the user's question (usually Russian).
+2. When referencing an item, include a brief quote from it in the format: > quote (см. #42)
+3. If items don't have enough info — say so honestly, don't guess.
+4. Keep answer concise: 3-5 sentences.
+5. Answer in the SAME language as the user's question (usually Russian).
 """
 
 

@@ -30,6 +30,10 @@ MIGRATIONS = [
     """
     ALTER TABLE items ADD COLUMN forward_url TEXT;
     """,
+    # Migration 8: Add user_note column for personal annotations
+    """
+    ALTER TABLE items ADD COLUMN user_note TEXT;
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):
