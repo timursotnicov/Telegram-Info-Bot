@@ -67,11 +67,14 @@ async def classify_content(
         "Content-Type": "application/json",
     }
 
+    # Merge system prompt into user message for compatibility with models
+    # that don't support the "system" role (e.g. gemma-3-27b-it)
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{user_prompt}"
+
     payload = {
         "model": config.ai_model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": full_prompt},
         ],
         "temperature": 0.3,
         "max_tokens": 300,
@@ -92,6 +95,9 @@ async def classify_content(
                     if resp.status == 429:
                         logger.warning("Model %s rate-limited (429), trying next", model)
                         await asyncio.sleep(1)
+                        continue
+                    if resp.status == 400:
+                        logger.warning("Model %s returned 400, trying next: %s", model, await resp.text())
                         continue
                     if resp.status != 200:
                         logger.error("OpenRouter API error: %s %s", resp.status, await resp.text())

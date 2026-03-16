@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import math
 
 from aiogram import F, Router, types
@@ -14,6 +15,7 @@ from savebot.db.state_store import set_state
 from savebot.services.ai_search import parse_search_query, synthesize_answer
 
 router = Router()
+logger = logging.getLogger(__name__)
 PAGE_SIZE = 5
 
 # Context type short codes for callback data
@@ -293,6 +295,7 @@ async def on_hub_forgotten(callback: types.CallbackQuery, db=None):
 @router.callback_query(F.data == "bm:newcat")
 async def on_hub_newcat(callback: types.CallbackQuery, db=None):
     user_id = callback.from_user.id
+    logger.info("bm:newcat callback: setting new_browse_cat state for user %d", user_id)
     await set_state(db, f"new_browse_cat_{user_id}", user_id, "new_browse_cat", {})
     await callback.message.edit_text(
         "📁 <b>Новая категория</b>\n\nВведите название:",
