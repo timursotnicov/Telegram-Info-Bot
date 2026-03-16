@@ -272,3 +272,99 @@ async def test_get_all_tags(db):
     # alpha should be first (count=2)
     assert tags[0]["tag"] == "alpha"
     assert tags[0]["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_get_related_items_by_shared_tags(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Dev", "\U0001f4c1")
+    item1 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Python web framework", tags=["python", "web"],
+    )
+    item2 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Python data science", tags=["python", "data"],
+    )
+    item3 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Python web scraping", tags=["python", "web"],
+    )
+
+    related = await queries.get_related_items(db, USER_ID, item1, limit=5)
+    assert len(related) >= 2
+    related_ids = [r["id"] for r in related]
+    # item3 shares 2 tags (python, web) — should be first
+    assert item3 in related_ids
+    assert item2 in related_ids
+    assert item1 not in related_ids
+    # All items should have tags attached
+    for r in related:
+        assert "tags" in r
+
+
+@pytest.mark.asyncio
+async def test_get_related_items_same_category_fallback(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Notes", "\U0001f4c1")
+    item1 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Note one", tags=["unique_a"],
+    )
+    item2 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Note two", tags=["unique_b"],
+    )
+
+    # No shared tags, but same category — should still find related
+    related = await queries.get_related_items(db, USER_ID, item1, limit=5)
+    assert len(related) >= 1
+    assert item2 in [r["id"] for r in related]
+
+
+@pytest.mark.asyncio
+async def test_get_related_items_fts_fallback(db):
+    cat1 = await queries.get_or_create_category(db, USER_ID, "A", "\U0001f4c1")
+    cat2 = await queries.get_or_create_category(db, USER_ID, "B", "\U0001f4c1")
+    item1 = await queries.save_item(
+        db, USER_ID, category_id=cat1["id"],
+        content_type="text", content_text="Unique alpha content",
+        tags=["unique_x"], ai_summary="Kubernetes deployment strategies overview",
+    )
+    item2 = await queries.save_item(
+        db, USER_ID, category_id=cat2["id"],
+        content_type="text", content_text="Kubernetes deployment guide with strategies",
+        tags=["unique_y"], ai_summary="Kubernetes deployment strategies deep dive",
+    )
+
+    # Different tags, different categories — FTS should find via ai_summary words
+    related = await queries.get_related_items(db, USER_ID, item1, limit=5)
+    assert len(related) >= 1
+    assert item2 in [r["id"] for r in related]
+
+
+@pytest.mark.asyncio
+async def test_get_related_items_empty(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Solo", "\U0001f4c1")
+    item1 = await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Only item", tags=["lonely"],
+    )
+    related = await queries.get_related_items(db, USER_ID, item1, limit=5)
+    assert related == []
+
+
+@pytest.mark.asyncio
+async def test_get_related_items_user_isolation(db):
+    cat1 = await queries.get_or_create_category(db, USER_ID, "Cat", "\U0001f4c1")
+    cat2 = await queries.get_or_create_category(db, OTHER_USER, "Cat", "\U0001f4c1")
+    item1 = await queries.save_item(
+        db, USER_ID, category_id=cat1["id"],
+        content_type="text", content_text="My item", tags=["shared_tag"],
+    )
+    await queries.save_item(
+        db, OTHER_USER, category_id=cat2["id"],
+        content_type="text", content_text="Other user item", tags=["shared_tag"],
+    )
+
+    related = await queries.get_related_items(db, USER_ID, item1, limit=5)
+    for r in related:
+        assert r["user_id"] == USER_ID
