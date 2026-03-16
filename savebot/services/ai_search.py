@@ -15,30 +15,32 @@ logger = logging.getLogger(__name__)
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 PARSE_QUERY_PROMPT = """\
-You are a search query parser. The user will give you a search query in any language.
-Extract structured filters from it. Today's date is {today}.
+Parse a search query into structured JSON filters. Today: {today}. Respond with ONLY valid JSON.
 
-Respond with ONLY valid JSON (no markdown, no code blocks):
-{{"keywords": ["word1", "word2"], "date_from": "YYYY-MM-DD or null", "date_to": "YYYY-MM-DD or null", "category_hint": "category name or null", "tag_hint": "tag name or null"}}
+Format: {{"keywords": ["word1"], "date_from": "YYYY-MM-DD or null", "date_to": "YYYY-MM-DD or null", "category_hint": "or null", "tag_hint": "or null"}}
 
 Rules:
-- keywords: the main search terms, 1-4 words. Keep in original language.
-- date_from / date_to: only if the query mentions time ("last week" = 7 days ago, "yesterday" = yesterday, "in January" = Jan 1 to Jan 31). Use null if no time mentioned.
-- category_hint: only if the query explicitly mentions a category name. Use null otherwise.
-- tag_hint: only if the query explicitly mentions a tag. Use null otherwise.
-- If unsure about a filter, use null. Fewer wrong filters is better than more wrong filters.
+- keywords: 1-4 main search terms, keep original language.
+- date_from/date_to: only if time is mentioned. null otherwise.
+  - "за последнюю неделю" / "last week" = 7 days ago → today
+  - "вчера" / "yesterday" = yesterday → yesterday
+  - "в январе" / "in January" = Jan 1 → Jan 31 (current year)
+  - "за последний месяц" = 30 days ago → today
+- category_hint/tag_hint: only if explicitly mentioned. null otherwise.
+- When unsure, use null. Wrong filters are worse than missing filters.
+
+Example: "статьи про нейросети за последнюю неделю"
+Output: {{"keywords": ["нейросети", "статьи"], "date_from": "{example_week_ago}", "date_to": "{today}", "category_hint": null, "tag_hint": null}}
 """
 
 SYNTHESIZE_PROMPT = """\
-You are a helpful assistant. The user has a personal knowledge base of saved items.
-You will receive the user's question and a list of their saved items that might be relevant.
+Answer the user's question using ONLY the saved items provided below. Do NOT invent information.
 
-Your task:
-1. Answer the question based ONLY on the provided items. Do not invent information.
-2. Reference items by their ID numbers like this: (see #42, #17).
-3. If the items don't contain enough info to answer, say so honestly.
-4. Keep your answer concise (3-5 sentences).
-5. Answer in the same language the user used in their question.
+Rules:
+1. Reference items by ID: (см. #42, #17) or (see #42, #17).
+2. If items don't have enough info — say so honestly, don't guess.
+3. Keep answer concise: 3-5 sentences.
+4. Answer in the SAME language as the user's question (usually Russian).
 """
 
 
@@ -51,11 +53,14 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
         "Authorization": f"Bearer {config.openrouter_api_key}",
         "Content-Type": "application/json",
     }
+    # Merge system prompt into user message for compatibility with models
+    # that don't support the "system" role (e.g. gemma-3-27b-it)
+    full_prompt = f"{system_prompt}\n\n{user_prompt}"
+
     payload = {
         "model": config.ai_model,
         "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": full_prompt},
         ],
         "temperature": temperature,
         "max_tokens": max_tokens,
@@ -100,7 +105,8 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
 async def parse_search_query(query: str) -> dict | None:
     """Parse a natural language search query into structured filters."""
     today = datetime.now().strftime("%Y-%m-%d")
-    system = PARSE_QUERY_PROMPT.format(today=today)
+    example_week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    system = PARSE_QUERY_PROMPT.format(today=today, example_week_ago=example_week_ago)
 
     text = await _call_openrouter(system, query, temperature=0.1, max_tokens=200)
     if not text:

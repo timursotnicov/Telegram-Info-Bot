@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-OCR_PROMPT = "Extract ALL text from this image. Return ONLY the extracted text, nothing else. If there is no text in the image, return an empty string."
+OCR_PROMPT = "Extract ALL text from this image exactly as written. Text may be in Russian, English, or mixed. Return ONLY the extracted text, preserving line breaks. If there is no text, return empty string. Ignore decorative elements, logos, and graphics — only extract readable text."
 
 
 async def extract_text_from_image(bot: Bot, file_id: str) -> str | None:

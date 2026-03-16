@@ -13,29 +13,22 @@ from savebot.config import config
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
-You are a content categorization assistant. Given a piece of content, you must categorize it.
-
-You will receive:
-- The content text
-- A list of existing categories (use one if appropriate)
-- A list of frequently used tags
+Categorize the content below. Respond with ONLY valid JSON, no markdown.
 
 Rules:
-1. Pick the BEST existing category, or suggest a NEW descriptive one if none fit well.
-2. NEVER use generic names like "Inbox", "Other", "General", "Misc". Always pick a specific topic name.
-3. Предпочитай КОНКРЕТНЫЕ подкатегории вместо общих. Примеры:
-   - НЕ «Технологии» → а «Искусственный интеллект», «Веб-разработка», «Кибербезопасность»
-   - НЕ «Бизнес» → а «Маркетинг», «Стартапы», «Финансы», «Продажи»
-   - НЕ «Наука» → а «Космос», «Биология», «Физика»
-   - НЕ «Образование» → а «Программирование», «Языки», «Саморазвитие»
-4. Используй существующую категорию ТОЛЬКО если контент точно попадает в её тематику. Если нет — создай новую более конкретную.
-5. Длина названия категории: 1-3 слова. Не длиннее.
-6. Suggest 1-3 relevant tags (short, lowercase, no #).
-7. Write a one-sentence summary in the same language as the content.
-8. For the category, also suggest an appropriate emoji.
+1. Category: pick from existing list if it fits, otherwise create a NEW specific one (1-3 words).
+2. NEVER use generic categories: "Inbox", "Other", "General", "Misc", "Технологии", "Бизнес", "Наука", "Образование".
+   Use specific subtopics: "Искусственный интеллект", "Маркетинг", "Космос", "Веб-разработка" etc.
+3. Tags: 1-3, lowercase, use underscores not hyphens (e.g. "machine_learning" not "machine-learning").
+4. Summary: one sentence, same language as content.
+5. If content is a URL/link — categorize by the topic the link is about.
+6. If content is a forwarded message — categorize by the message topic, not by who sent it.
 
-Respond with ONLY valid JSON (no markdown, no code blocks):
-{"category": "CategoryName", "emoji": "📁", "tags": ["tag1", "tag2"], "summary": "Brief summary"}
+JSON format:
+{"category": "Name", "emoji": "🔬", "tags": ["tag1", "tag2"], "summary": "Краткое описание"}
+
+Example input: "Статья про то, как нейросети помогают в диагностике рака"
+Example output: {"category": "Медицина и ИИ", "emoji": "🏥", "tags": ["нейросети", "диагностика", "медицина"], "summary": "Статья о применении нейросетей для диагностики рака"}
 """
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
