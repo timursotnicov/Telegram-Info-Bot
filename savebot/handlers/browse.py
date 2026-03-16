@@ -671,15 +671,36 @@ async def on_action_pin(callback: types.CallbackQuery, db=None):
                     return
 
 
+def _extract_list_context(callback: types.CallbackQuery) -> tuple[str, str, int] | None:
+    """Extract (ctx_short, ctx_id, offset) from the vl: back button in current keyboard."""
+    kb = callback.message.reply_markup
+    if kb and kb.inline_keyboard:
+        for row in kb.inline_keyboard:
+            for btn in row:
+                if btn.callback_data and btn.callback_data.startswith("vl:"):
+                    parts = btn.callback_data.split(":")
+                    return parts[1], parts[2], int(parts[3])
+    return None
+
+
 @router.callback_query(F.data.startswith("va:del:"))
 async def on_action_delete(callback: types.CallbackQuery, db=None):
     item_id = int(callback.data.split(":")[2])
+    ctx = _extract_list_context(callback)
+
     buttons = [
         [
             InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"va:dyes:{item_id}"),
             InlineKeyboardButton(text="❌ Отмена", callback_data=f"va:dno:{item_id}"),
         ]
     ]
+    if ctx:
+        ctx_short, ctx_id, offset = ctx
+        buttons.append([InlineKeyboardButton(
+            text="🔙 К списку",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset}",
+        )])
+
     await callback.message.edit_text(
         f"🗑 Удалить запись #{item_id}?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
@@ -693,9 +714,48 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
     item_id = int(callback.data.split(":")[2])
     user_id = callback.from_user.id
 
+    if db is None:
+        db = callback.bot.get("db")
+
+    ctx = _extract_list_context(callback)
+
     deleted = await queries.delete_item(db, user_id, item_id)
-    if deleted:
-        await callback.answer("🗑 Удалено")
+    if not deleted:
+        await callback.answer("Запись не найдена.")
+        return
+
+    await callback.answer("🗑 Удалено")
+
+    if ctx:
+        ctx_short, ctx_id, offset = ctx
+        context_type = _CTX_REV.get(ctx_short, "recent")
+
+        # Check if current page still has items
+        items = await queries.get_items_page_with_nums(
+            db, user_id, context_type,
+            context_id=ctx_id if context_type in ("category", "tag") else None,
+            limit=PAGE_SIZE, offset=offset,
+        )
+        if not items and offset > 0:
+            offset = max(0, offset - PAGE_SIZE)
+
+        items = await queries.get_items_page_with_nums(
+            db, user_id, context_type,
+            context_id=ctx_id if context_type in ("category", "tag") else None,
+            limit=PAGE_SIZE, offset=offset,
+        )
+        if not items:
+            await callback.message.edit_text(
+                "📋 <b>Список пуст.</b>",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [_back_button_for_ctx(ctx_short)]
+                ]),
+                parse_mode="HTML",
+            )
+            return
+
+        await _show_list(callback, context_type, ctx_id, offset, db=db)
+    else:
         await callback.message.edit_text(
             "🗑 Запись удалена.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -703,21 +763,25 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
             ]),
             parse_mode="HTML",
         )
-    else:
-        await callback.answer("Запись не найдена.")
 
 
 @router.callback_query(F.data.startswith("va:dno:"))
 async def on_action_delete_cancel(callback: types.CallbackQuery, db=None):
     item_id = int(callback.data.split(":")[2])
     await callback.answer("Отменено")
-    await callback.message.edit_text(
-        "↩️ Удаление отменено.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")]
-        ]),
-        parse_mode="HTML",
-    )
+
+    ctx = _extract_list_context(callback)
+    if ctx:
+        ctx_short, ctx_id, _ = ctx
+        await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db)
+    else:
+        await callback.message.edit_text(
+            "↩️ Удаление отменено.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")]
+            ]),
+            parse_mode="HTML",
+        )
 
 
 @router.callback_query(F.data.startswith("va:move:"))
