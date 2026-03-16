@@ -727,7 +727,7 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
     user_id = message.from_user.id
     query = query_override or message.text.replace("/search", "", 1).strip()
     if not query:
-        await message.reply("Использование: /search <запрос>")
+        await message.reply("Использование: /search &lt;запрос&gt;")
         return
 
     # Try AI-powered search first
@@ -798,7 +798,7 @@ async def cmd_ask(message: types.Message, db=None):
     question = message.text.replace("/ask", "", 1).strip()
     if not question:
         await message.reply(
-            "Использование: /ask <вопрос>\n\n"
+            "Использование: /ask &lt;вопрос&gt;\n\n"
             "Примеры:\n"
             "• /ask какие идеи я сохранял про маркетинг?\n"
             "• /ask что я знаю про продуктивность?\n"
@@ -892,7 +892,7 @@ async def cmd_pin(message: types.Message, db=None):
     user_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
-        await message.reply("Использование: /pin <id>")
+        await message.reply("Использование: /pin &lt;id&gt;")
         return
     try:
         item_id = int(parts[1])
@@ -911,7 +911,7 @@ async def cmd_unpin(message: types.Message, db=None):
     user_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
-        await message.reply("Использование: /unpin <id>")
+        await message.reply("Использование: /unpin &lt;id&gt;")
         return
     try:
         item_id = int(parts[1])
@@ -953,7 +953,7 @@ async def cmd_markread(message: types.Message, db=None):
     user_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
-        await message.reply("Использование: /markread <id>")
+        await message.reply("Использование: /markread &lt;id&gt;")
         return
     try:
         item_id = int(parts[1])

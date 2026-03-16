@@ -256,7 +256,7 @@ async def cmd_edit(message: types.Message, db=None, **kwargs):
     user_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
-        await message.reply("Использование: /edit <id>")
+        await message.reply("Использование: /edit &lt;id&gt;")
         return
 
     try:
