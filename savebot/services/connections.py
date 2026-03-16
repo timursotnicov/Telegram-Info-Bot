@@ -28,4 +28,14 @@ async def find_related_items(db, item_id: int, user_id: int, category_id: int | 
                 if len(related) >= top_k:
                     break
 
+    # 3. FTS5 similarity by ai_summary
+    if len(related) < top_k:
+        fts_items = await queries.get_similar_items_fts(db, user_id, item_id, limit=top_k)
+        for item in fts_items:
+            if item["id"] not in seen_ids:
+                related.append(item)
+                seen_ids.add(item["id"])
+                if len(related) >= top_k:
+                    break
+
     return related[:top_k]

@@ -539,86 +539,30 @@ async def get_items_in_same_category(db: aiosqlite.Connection, user_id: int, ite
     return await _attach_tags(db, items)
 
 
-async def get_related_items(db: aiosqlite.Connection, user_id: int, item_id: int, limit: int = 5) -> list[dict]:
-    """Find items related to the given item using a multi-strategy approach.
-
-    Strategy order:
-    1. Items sharing tags (ordered by number of shared tags)
-    2. Items from the same category (if still under limit)
-    3. FTS5 search by first 3 words of ai_summary (if still under limit)
-    """
-    found_ids: set[int] = {item_id}
-    result: list[dict] = []
-
-    # Strategy 1: shared tags
+async def get_similar_items_fts(db: aiosqlite.Connection, user_id: int, item_id: int, limit: int = 5) -> list[dict]:
+    """Find similar items via FTS5 using the first 3 words of ai_summary."""
     cursor = await db.execute(
-        """SELECT i.*, COUNT(t2.tag) as shared_count
-           FROM item_tags t1
-           JOIN item_tags t2 ON t1.tag = t2.tag AND t2.item_id != t1.item_id
-           JOIN items i ON i.id = t2.item_id
-           WHERE t1.item_id = ? AND i.user_id = ?
-           GROUP BY i.id
-           ORDER BY shared_count DESC
-           LIMIT ?""",
-        (item_id, user_id, limit),
+        "SELECT ai_summary FROM items WHERE id = ? AND user_id = ?",
+        (item_id, user_id),
     )
-    for row in await cursor.fetchall():
-        item = dict(row)
-        if item["id"] not in found_ids:
-            found_ids.add(item["id"])
-            result.append(item)
+    row = await cursor.fetchone()
+    if not row or not row["ai_summary"]:
+        return []
 
-    # Strategy 2: same category
-    if len(result) < limit:
-        item_row = await db.execute(
-            "SELECT category_id, ai_summary FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user_id),
-        )
-        item_data = await item_row.fetchone()
-        if item_data and item_data["category_id"]:
-            remaining = limit - len(result)
-            cursor = await db.execute(
-                """SELECT * FROM items
-                   WHERE category_id = ? AND user_id = ? AND id != ?
-                   ORDER BY created_at DESC LIMIT ?""",
-                (item_data["category_id"], user_id, item_id, remaining + len(found_ids)),
-            )
-            for row in await cursor.fetchall():
-                if len(result) >= limit:
-                    break
-                item = dict(row)
-                if item["id"] not in found_ids:
-                    found_ids.add(item["id"])
-                    result.append(item)
-    else:
-        item_row = await db.execute(
-            "SELECT ai_summary FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user_id),
-        )
-        item_data = await item_row.fetchone()
+    words = row["ai_summary"].split()[:3]
+    fts_query = _escape_fts5(words)
+    if not fts_query:
+        return []
 
-    # Strategy 3: FTS5 by first 3 words of ai_summary
-    if len(result) < limit and item_data and item_data["ai_summary"]:
-        words = item_data["ai_summary"].split()[:3]
-        fts_query = _escape_fts5(words)
-        if fts_query:
-            remaining = limit - len(result)
-            cursor = await db.execute(
-                """SELECT i.* FROM items_fts fts
-                   JOIN items i ON i.id = fts.rowid
-                   WHERE items_fts MATCH ? AND i.user_id = ?
-                   ORDER BY rank LIMIT ?""",
-                (fts_query, user_id, remaining + len(found_ids)),
-            )
-            for row in await cursor.fetchall():
-                if len(result) >= limit:
-                    break
-                item = dict(row)
-                if item["id"] not in found_ids:
-                    found_ids.add(item["id"])
-                    result.append(item)
-
-    return await _attach_tags(db, result)
+    cursor = await db.execute(
+        """SELECT i.* FROM items_fts fts
+           JOIN items i ON i.id = fts.rowid
+           WHERE items_fts MATCH ? AND i.user_id = ? AND i.id != ?
+           ORDER BY rank LIMIT ?""",
+        (fts_query, user_id, item_id, limit),
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+    return await _attach_tags(db, items)
 
 
 # ── Navigation ─────────────────────────────────────────────
