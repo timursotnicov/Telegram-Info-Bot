@@ -657,6 +657,17 @@ async def delete_collection(db: aiosqlite.Connection, user_id: int, collection_i
     return cursor.rowcount > 0
 
 
+async def count_collection_items(db: aiosqlite.Connection, user_id: int, collection_id: int) -> int:
+    """Count items in a collection belonging to the user."""
+    cursor = await db.execute(
+        """SELECT COUNT(*) as c FROM collection_items ci
+           JOIN items i ON i.id = ci.item_id
+           WHERE ci.collection_id = ? AND i.user_id = ?""",
+        (collection_id, user_id),
+    )
+    return (await cursor.fetchone())["c"]
+
+
 # ── Navigation ─────────────────────────────────────────────
 
 def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, list, str]:
@@ -680,6 +691,12 @@ def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, 
             "i.is_pinned = 0 AND i.created_at < datetime('now', '-30 days') AND i.user_id = ?",
             [],
             "i.created_at ASC",
+        )
+    elif context_type == "collection":
+        return (
+            "i.id IN (SELECT item_id FROM collection_items WHERE collection_id = ?) AND i.user_id = ?",
+            [context_id],
+            "i.created_at DESC",
         )
     else:
         raise ValueError(f"Unknown context_type: {context_type}")

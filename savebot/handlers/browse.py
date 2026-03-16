@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 5
 
 # Context type short codes for callback data
-_CTX_MAP = {"category": "c", "tag": "t", "recent": "r", "pinned": "p", "readlist": "l", "forgotten": "f"}
+_CTX_MAP = {"category": "c", "tag": "t", "recent": "r", "pinned": "p", "readlist": "l", "forgotten": "f", "collection": "o"}
 _CTX_REV = {v: k for k, v in _CTX_MAP.items()}
 
 # Context titles
@@ -31,6 +31,7 @@ _CTX_TITLES = {
     "pinned": "📌 Закреплённые",
     "readlist": "📖 Список чтения",
     "forgotten": "🕸 Забытые записи",
+    "collection": "📁 Коллекция",
 }
 
 
@@ -172,6 +173,8 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
         return InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")
     elif ctx_short == "t":
         return InlineKeyboardButton(text="🔙 К тегам", callback_data="tags_back")
+    elif ctx_short == "o":
+        return InlineKeyboardButton(text="🔙 К коллекциям", callback_data="bm:colls")
     else:
         return InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")
 
@@ -180,6 +183,7 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
 
 def _more_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📁 Коллекции", callback_data="bm:colls")],
         [InlineKeyboardButton(text="🗺 Карта знаний", callback_data="bm:map")],
         [InlineKeyboardButton(text="🕸 Забытые записи", callback_data="bm:forg")],
         [InlineKeyboardButton(text="➕ Новая категория", callback_data="bm:newcat")],
@@ -349,6 +353,67 @@ async def on_hub_forgotten(callback: types.CallbackQuery, db=None):
     await _show_list(callback, "forgotten", "0", 0, db=db)
 
 
+# ── Hub: Collections ──────────────────────────────────────
+
+async def _show_collections(callback_or_msg, db=None):
+    """Show collections list. Works with both callback and message."""
+    if isinstance(callback_or_msg, types.CallbackQuery):
+        user_id = callback_or_msg.from_user.id
+    else:
+        user_id = callback_or_msg.from_user.id
+
+    colls = await queries.get_collections(db, user_id)
+
+    buttons = []
+    for coll in colls:
+        emoji = coll.get("emoji", "📁")
+        buttons.append([InlineKeyboardButton(
+            text=f"{emoji} {coll['name']} ({coll['item_count']})",
+            callback_data=f"bc:{coll['id']}:0",
+        )])
+    buttons.append([InlineKeyboardButton(text="➕ Новая коллекция", callback_data="bm:newcoll")])
+    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
+
+    text = "📁 <b>Коллекции:</b>" if colls else "📁 <b>Коллекций пока нет.</b>"
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    if isinstance(callback_or_msg, types.CallbackQuery):
+        await callback_or_msg.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+        await callback_or_msg.answer()
+    else:
+        await callback_or_msg.reply(text, reply_markup=markup, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "bm:colls")
+async def on_hub_colls(callback: types.CallbackQuery, db=None):
+    await _show_collections(callback, db=db)
+
+
+@router.message(Command("collections"))
+async def cmd_collections(message: types.Message, db=None):
+    await _show_collections(message, db=db)
+
+
+@router.callback_query(F.data.startswith("bc:"))
+async def on_browse_collection(callback: types.CallbackQuery, db=None):
+    # bc:{collection_id}:{offset}
+    parts = callback.data.split(":")
+    coll_id = parts[1]
+    offset = int(parts[2])
+    await _show_list(callback, "collection", coll_id, offset, db=db)
+
+
+@router.callback_query(F.data == "bm:newcoll")
+async def on_hub_newcoll(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    await set_state(db, f"new_collection_{user_id}", user_id, "new_collection", {})
+    await callback.message.edit_text(
+        "📁 <b>Новая коллекция</b>\n\nВведите название:",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
 # ── Hub: New Category ─────────────────────────────────────
 
 @router.callback_query(F.data == "bm:newcat")
@@ -386,6 +451,8 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         total = await queries.count_items_in_category(db, user_id, int(ctx_id))
     elif context_type == "tag":
         total = await queries.count_items_by_tag(db, user_id, str(ctx_id))
+    elif context_type == "collection":
+        total = await queries.count_collection_items(db, user_id, int(ctx_id))
     else:
         # Use a general approach — get_items_page_with_nums with high limit to count
         # For simplicity, estimate from display_num of last item
@@ -407,6 +474,11 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         title = f"{cat_emoji} <b>{cat_name}</b> ({total})"
     elif context_type == "tag":
         title = f"🏷 <b>#{ctx_id}</b> ({total})"
+    elif context_type == "collection":
+        colls = await queries.get_collections(db, user_id)
+        coll_name = next((c["name"] for c in colls if c["id"] == int(ctx_id)), "")
+        coll_emoji = next((c.get("emoji", "📁") for c in colls if c["id"] == int(ctx_id)), "📁")
+        title = f"{coll_emoji} <b>{coll_name}</b> ({total})"
     else:
         title = f"{title} ({total})"
 
@@ -602,11 +674,12 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     if item.get("forward_url"):
         buttons.append([InlineKeyboardButton(text="📨 Оригинал", url=item["forward_url"])])
 
-    # Action row 2: tags, note, related, mark read
+    # Action row 2: tags, note, related, collection, mark read
     actions2 = []
     actions2.append(InlineKeyboardButton(text="🏷 Теги", callback_data=f"va:tags:{item_id}"))
     actions2.append(InlineKeyboardButton(text="✏️ Заметка", callback_data=f"va:note:{item_id}"))
     actions2.append(InlineKeyboardButton(text="🔗 Похожие", callback_data=f"va:rel:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="📁+", callback_data=f"va:coll:{item_id}"))
     if not item.get("is_read"):
         actions2.append(InlineKeyboardButton(text="✅ Прочитано", callback_data=f"va:read:{item_id}"))
     buttons.append(actions2)
@@ -938,6 +1011,62 @@ async def on_action_related(callback: types.CallbackQuery, db=None):
     await callback.message.edit_text(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("va:coll:"))
+async def on_action_add_to_collection(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    item_id = int(callback.data.split(":")[2])
+
+    colls = await queries.get_collections(db, user_id)
+
+    buttons = []
+    for coll in colls:
+        emoji = coll.get("emoji", "📁")
+        buttons.append([InlineKeyboardButton(
+            text=f"{emoji} {coll['name']}",
+            callback_data=f"va:ac:{item_id}:{coll['id']}",
+        )])
+    buttons.append([InlineKeyboardButton(text="➕ Новая", callback_data=f"va:nc:{item_id}")])
+    buttons.append([InlineKeyboardButton(text="🔙 К записи", callback_data=f"vi:r:0:{item_id}")])
+
+    await callback.message.edit_text(
+        "📁 <b>Добавить в коллекцию:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("va:ac:"))
+async def on_action_add_to_coll_confirm(callback: types.CallbackQuery, db=None):
+    # va:ac:{item_id}:{coll_id}
+    user_id = callback.from_user.id
+    parts = callback.data.split(":")
+    item_id = int(parts[2])
+    coll_id = int(parts[3])
+
+    added = await queries.add_to_collection(db, user_id, coll_id, item_id)
+    if added:
+        await callback.answer("✅ Добавлено в коллекцию")
+    else:
+        await callback.answer("Уже в коллекции или ошибка")
+
+    # Return to item view
+    await _show_item_view(callback, "r", "0", item_id, db=db)
+
+
+@router.callback_query(F.data.startswith("va:nc:"))
+async def on_action_new_collection_for_item(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    item_id = int(callback.data.split(":")[2])
+
+    await set_state(db, f"new_collection_{user_id}", user_id, "new_collection", {"item_id": item_id})
+    await callback.message.edit_text(
+        "📁 <b>Новая коллекция</b>\n\nВведите название:",
         parse_mode="HTML",
     )
     await callback.answer()

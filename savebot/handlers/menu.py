@@ -94,6 +94,25 @@ async def state_dispatcher(message: types.Message, db=None):
             await message.reply(f"⚠️ {e}")
         return
 
+    # Check new_collection state
+    state = await get_state(db, f"new_collection_{user_id}")
+    if state is not None:
+        logger.info("State dispatcher: found new_collection state for user %d", user_id)
+        await delete_state(db, f"new_collection_{user_id}")
+        try:
+            coll = await queries.create_collection(db, user_id, text)
+            item_id = state.get("item_id")
+            if item_id:
+                await queries.add_to_collection(db, user_id, coll["id"], item_id)
+                await message.reply(
+                    f"✅ Коллекция «{text}» создана, запись #{item_id} добавлена!"
+                )
+            else:
+                await message.reply(f"✅ Коллекция «{text}» создана!")
+        except Exception:
+            await message.reply("⚠️ Не удалось создать коллекцию. Возможно, такое имя уже существует.")
+        return
+
     # Check edit_tags state
     state = await get_state(db, f"edit_tags_{user_id}")
     if state is not None:
@@ -132,7 +151,7 @@ async def state_dispatcher(message: types.Message, db=None):
 async def handle_keyboard_button(message: types.Message, db=None):
     # Clear any pending states when user presses a keyboard button
     user_id = message.from_user.id
-    for prefix in ("search_prompt_", "rename_cat_", "new_browse_cat_", "awaiting_", "edit_tags_", "edit_note_"):
+    for prefix in ("search_prompt_", "rename_cat_", "new_browse_cat_", "new_collection_", "awaiting_", "edit_tags_", "edit_note_"):
         await delete_state(db, f"{prefix}{user_id}")
 
     text = message.text
