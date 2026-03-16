@@ -438,7 +438,7 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     ctx_short = _CTX_MAP.get(context_type, "r")
 
     items = await queries.get_items_page_with_nums(
-        db, user_id, context_type, context_id=ctx_id if context_type in ("category", "tag") else None,
+        db, user_id, context_type, context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
         limit=PAGE_SIZE, offset=offset,
     )
 
@@ -565,7 +565,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     # Check if current page still has items
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
         limit=PAGE_SIZE, offset=offset,
     )
     # If page is empty after delete, go back one page
@@ -575,7 +575,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     # Re-check after adjusted offset
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
         limit=PAGE_SIZE, offset=offset,
     )
     if not items:
@@ -632,7 +632,7 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     # Get adjacent items for navigation
     nav = await queries.get_adjacent_item_ids(
         db, user_id, item_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
     )
 
     position = nav["position"] if nav else None
@@ -814,7 +814,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
         # Check if current page still has items
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
-            context_id=ctx_id if context_type in ("category", "tag") else None,
+            context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
             limit=PAGE_SIZE, offset=offset,
         )
         if not items and offset > 0:
@@ -822,7 +822,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
 
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
-            context_id=ctx_id if context_type in ("category", "tag") else None,
+            context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
             limit=PAGE_SIZE, offset=offset,
         )
         if not items:
@@ -996,6 +996,10 @@ async def on_action_related(callback: types.CallbackQuery, db=None):
         await callback.answer("Похожих записей не найдено", show_alert=False)
         return
 
+    # Preserve original browsing context for navigation
+    ctx = _extract_list_context(callback)
+    ctx_short, ctx_id = (ctx[0], ctx[1]) if ctx else ("r", "0")
+
     lines = ["🔗 <b>Похожие записи:</b>\n"]
     buttons = []
     for r in related:
@@ -1003,10 +1007,13 @@ async def on_action_related(callback: types.CallbackQuery, db=None):
         lines.append(f"• <b>#{r['id']}</b> {html.escape(title)}")
         buttons.append([InlineKeyboardButton(
             text=f"#{r['id']} {title}",
-            callback_data=f"vi:r:0:{r['id']}",
+            callback_data=f"vi:{ctx_short}:{ctx_id}:{r['id']}",
         )])
 
-    buttons.append([InlineKeyboardButton(text="🔙 К записи", callback_data=f"vi:r:0:{item_id}")])
+    buttons.append([InlineKeyboardButton(
+        text="🔙 К записи",
+        callback_data=f"vi:{ctx_short}:{ctx_id}:{item_id}",
+    )])
 
     await callback.message.edit_text(
         "\n".join(lines),

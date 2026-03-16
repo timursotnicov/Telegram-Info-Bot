@@ -627,7 +627,7 @@ async def add_to_collection(db: aiosqlite.Connection, user_id: int, collection_i
         )
         await db.commit()
         return True
-    except Exception:
+    except aiosqlite.IntegrityError:
         return False
 
 
