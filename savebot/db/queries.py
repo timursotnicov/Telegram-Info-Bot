@@ -103,7 +103,7 @@ async def save_item(
     for tag in tags:
         await db.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag) VALUES (?, ?)",
-            (item_id, tag),
+            (item_id, tag.replace("-", "_")),
         )
     await db.commit()
     return item_id
@@ -184,7 +184,7 @@ async def update_item_tags(db: aiosqlite.Connection, user_id: int, item_id: int,
     for tag in tags:
         await db.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag) VALUES (?, ?)",
-            (item_id, tag),
+            (item_id, tag.replace("-", "_")),
         )
     await db.commit()
 
