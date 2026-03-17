@@ -177,25 +177,6 @@ async def test_pin_and_unpin(db):
 
 
 @pytest.mark.asyncio
-async def test_readlist(db):
-    cat = await queries.get_or_create_category(db, USER_ID, "Test", "\U0001f4c1")
-    item_id = await queries.save_item(
-        db, USER_ID, category_id=cat["id"],
-        content_type="link", content_text="Article", tags=[], url="https://example.com",
-    )
-    # Manually set as unread (normally done in save handler)
-    await db.execute("UPDATE items SET is_read = 0 WHERE id = ?", (item_id,))
-    await db.commit()
-
-    unread = await queries.get_unread_items(db, USER_ID)
-    assert len(unread) == 1
-
-    assert await queries.mark_item_read(db, USER_ID, item_id)
-    unread = await queries.get_unread_items(db, USER_ID)
-    assert len(unread) == 0
-
-
-@pytest.mark.asyncio
 async def test_user_isolation(db):
     cat = await queries.get_or_create_category(db, USER_ID, "Private", "\U0001f5dd")
     item_id = await queries.save_item(
@@ -941,51 +922,6 @@ async def test_count_items_by_tag_user_isolation(db):
     assert count == 0
 
 
-# ── mark_all_read ───────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_mark_all_read(db):
-    cat = await queries.get_or_create_category(db, USER_ID, "T", "\U0001f4c1")
-    for i in range(3):
-        item_id = await queries.save_item(
-            db, USER_ID, category_id=cat["id"],
-            content_type="link", content_text=f"Link{i}", tags=[],
-            url=f"https://example.com/{i}",
-        )
-        await db.execute("UPDATE items SET is_read = 0 WHERE id = ?", (item_id,))
-    await db.commit()
-
-    marked = await queries.mark_all_read(db, USER_ID)
-    assert marked == 3
-
-    unread = await queries.get_unread_items(db, USER_ID)
-    assert len(unread) == 0
-
-
-@pytest.mark.asyncio
-async def test_mark_all_read_already_read(db):
-    # Nothing unread -> should return 0
-    marked = await queries.mark_all_read(db, USER_ID)
-    assert marked == 0
-
-
-@pytest.mark.asyncio
-async def test_mark_all_read_user_isolation(db):
-    cat = await queries.get_or_create_category(db, USER_ID, "T", "\U0001f4c1")
-    item_id = await queries.save_item(
-        db, USER_ID, category_id=cat["id"],
-        content_type="link", content_text="Link", tags=[], url="https://a.com",
-    )
-    await db.execute("UPDATE items SET is_read = 0 WHERE id = ?", (item_id,))
-    await db.commit()
-
-    # Other user marks all read — should NOT affect USER_ID's items
-    await queries.mark_all_read(db, OTHER_USER)
-    unread = await queries.get_unread_items(db, USER_ID)
-    assert len(unread) == 1
-
-
 # ── get_category_tag_map ────────────────────────────────────
 
 
@@ -1157,20 +1093,6 @@ async def test_get_items_page_with_nums_pinned(db):
     page = await queries.get_items_page_with_nums(db, USER_ID, "pinned", limit=5)
     assert len(page) == 1
     assert page[0]["display_num"] == 1
-
-
-@pytest.mark.asyncio
-async def test_get_items_page_with_nums_readlist(db):
-    cat = await queries.get_or_create_category(db, USER_ID, "P", "\U0001f4c1")
-    item_id = await queries.save_item(
-        db, USER_ID, category_id=cat["id"],
-        content_type="link", content_text="Unread", tags=[], url="https://read.me",
-    )
-    await db.execute("UPDATE items SET is_read = 0 WHERE id = ?", (item_id,))
-    await db.commit()
-
-    page = await queries.get_items_page_with_nums(db, USER_ID, "readlist", limit=5)
-    assert len(page) == 1
 
 
 @pytest.mark.asyncio

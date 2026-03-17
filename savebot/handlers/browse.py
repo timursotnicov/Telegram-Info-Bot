@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 5
 
 # Context type short codes for callback data
-_CTX_MAP = {"category": "c", "tag": "t", "recent": "r", "pinned": "p", "readlist": "l", "forgotten": "f", "collection": "o"}
+_CTX_MAP = {"category": "c", "tag": "t", "recent": "r", "pinned": "p", "forgotten": "f", "collection": "o", "source": "s"}
 _CTX_REV = {v: k for k, v in _CTX_MAP.items()}
 
 # Context titles
@@ -29,9 +29,9 @@ _CTX_TITLES = {
     "tag": "🏷 Тег",
     "recent": "🕐 Последние записи",
     "pinned": "📌 Закреплённые",
-    "readlist": "📖 Список чтения",
     "forgotten": "🕸 Забытые записи",
     "collection": "📁 Коллекция",
+    "source": "📨 Каналы",
 }
 
 
@@ -175,6 +175,8 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
         return InlineKeyboardButton(text="🔙 К тегам", callback_data="tags_back")
     elif ctx_short == "o":
         return InlineKeyboardButton(text="🔙 К коллекциям", callback_data="bm:colls")
+    elif ctx_short == "s":
+        return InlineKeyboardButton(text="🔙 К каналам", callback_data="bm:sources")
     else:
         return InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")
 
@@ -183,6 +185,7 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
 
 def _more_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📨 Каналы", callback_data="bm:sources")],
         [InlineKeyboardButton(text="📁 Коллекции", callback_data="bm:colls")],
         [InlineKeyboardButton(text="🗺 Карта знаний", callback_data="bm:map")],
         [InlineKeyboardButton(text="🕸 Забытые записи", callback_data="bm:forg")],
@@ -353,6 +356,48 @@ async def on_hub_forgotten(callback: types.CallbackQuery, db=None):
     await _show_list(callback, "forgotten", "0", 0, db=db)
 
 
+# ── Hub: Sources (channels) ──────────────────────────────
+
+def _truncate_source(source: str, max_len: int = 40) -> str:
+    """Truncate source name for use in callback data."""
+    return source[:max_len]
+
+
+@router.callback_query(F.data == "bm:sources")
+async def on_hub_sources(callback: types.CallbackQuery, db=None):
+    user_id = callback.from_user.id
+    sources = await queries.get_all_sources(db, user_id)
+    if not sources:
+        await callback.answer("Нет пересланных записей из каналов.")
+        return
+
+    buttons = []
+    for src in sources:
+        name = src["source"]
+        trunc = _truncate_source(name)
+        buttons.append([InlineKeyboardButton(
+            text=f"📨 {name} ({src['count']})",
+            callback_data=f"src:{trunc}:0",
+        )])
+    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
+
+    await callback.message.edit_text(
+        "📨 <b>Каналы:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("src:"))
+async def on_browse_source(callback: types.CallbackQuery, db=None):
+    # src:{source_name}:{offset}
+    parts = callback.data.split(":")
+    source_name = parts[1]
+    offset = int(parts[2])
+    await _show_list(callback, "source", source_name, offset, db=db)
+
+
 # ── Hub: Collections ──────────────────────────────────────
 
 async def _show_collections(callback_or_msg, db=None):
@@ -438,7 +483,7 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     ctx_short = _CTX_MAP.get(context_type, "r")
 
     items = await queries.get_items_page_with_nums(
-        db, user_id, context_type, context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+        db, user_id, context_type, context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
         limit=PAGE_SIZE, offset=offset,
     )
 
@@ -453,6 +498,8 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         total = await queries.count_items_by_tag(db, user_id, str(ctx_id))
     elif context_type == "collection":
         total = await queries.count_collection_items(db, user_id, int(ctx_id))
+    elif context_type == "source":
+        total = await queries.count_items_by_source(db, user_id, str(ctx_id))
     else:
         # Use a general approach — get_items_page_with_nums with high limit to count
         # For simplicity, estimate from display_num of last item
@@ -479,6 +526,8 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         coll_name = next((c["name"] for c in colls if c["id"] == int(ctx_id)), "")
         coll_emoji = next((c.get("emoji", "📁") for c in colls if c["id"] == int(ctx_id)), "📁")
         title = f"{coll_emoji} <b>{coll_name}</b> ({total})"
+    elif context_type == "source":
+        title = f"📨 <b>{html.escape(str(ctx_id))}</b> ({total})"
     else:
         title = f"{title} ({total})"
 
@@ -565,7 +614,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     # Check if current page still has items
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
         limit=PAGE_SIZE, offset=offset,
     )
     # If page is empty after delete, go back one page
@@ -575,7 +624,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     # Re-check after adjusted offset
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
         limit=PAGE_SIZE, offset=offset,
     )
     if not items:
@@ -632,7 +681,7 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     # Get adjacent items for navigation
     nav = await queries.get_adjacent_item_ids(
         db, user_id, item_id, context_type,
-        context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+        context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
     )
 
     position = nav["position"] if nav else None
@@ -674,14 +723,12 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     if item.get("forward_url"):
         buttons.append([InlineKeyboardButton(text="📨 Оригинал", url=item["forward_url"])])
 
-    # Action row 2: tags, note, related, collection, mark read
+    # Action row 2: tags, note, related, collection
     actions2 = []
     actions2.append(InlineKeyboardButton(text="🏷 Теги", callback_data=f"va:tags:{item_id}"))
     actions2.append(InlineKeyboardButton(text="✏️ Заметка", callback_data=f"va:note:{item_id}"))
     actions2.append(InlineKeyboardButton(text="🔗 Похожие", callback_data=f"va:rel:{item_id}"))
     actions2.append(InlineKeyboardButton(text="📁+", callback_data=f"va:coll:{item_id}"))
-    if not item.get("is_read"):
-        actions2.append(InlineKeyboardButton(text="✅ Прочитано", callback_data=f"va:read:{item_id}"))
     buttons.append(actions2)
 
     # Back to list row
@@ -814,7 +861,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
         # Check if current page still has items
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
-            context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+            context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
             limit=PAGE_SIZE, offset=offset,
         )
         if not items and offset > 0:
@@ -822,7 +869,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
 
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
-            context_id=ctx_id if context_type in ("category", "tag", "collection") else None,
+            context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
             limit=PAGE_SIZE, offset=offset,
         )
         if not items:
@@ -906,30 +953,6 @@ async def on_action_move_confirm(callback: types.CallbackQuery, db=None):
         await _show_item_view(callback, "c", str(cat_id), item_id, db=db)
     else:
         await callback.answer("Ошибка перемещения.")
-
-
-@router.callback_query(F.data.startswith("va:read:"))
-async def on_action_read(callback: types.CallbackQuery, db=None):
-    item_id = int(callback.data.split(":")[2])
-    user_id = callback.from_user.id
-
-    marked = await queries.mark_item_read(db, user_id, item_id)
-    if marked:
-        await callback.answer("✅ Прочитано")
-    else:
-        await callback.answer("Запись не найдена.")
-
-    # Refresh item view
-    kb = callback.message.reply_markup
-    if kb and kb.inline_keyboard:
-        for row in kb.inline_keyboard:
-            for btn in row:
-                if btn.callback_data and btn.callback_data.startswith("vl:"):
-                    parts = btn.callback_data.split(":")
-                    ctx_short = parts[1]
-                    ctx_id = parts[2]
-                    await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db)
-                    return
 
 
 @router.callback_query(F.data.startswith("va:tags:"))
@@ -1275,7 +1298,7 @@ async def cmd_pinned(message: types.Message, db=None):
     user_id = message.from_user.id
     items = await queries.get_items_page_with_nums(db, user_id, "pinned", limit=PAGE_SIZE, offset=0)
     if not items:
-        await message.reply("📌 Нет закреплённых записей. Используйте /pin <id> чтобы закрепить.")
+        await message.reply("📌 Нет закреплённых записей. Используйте /pin &lt;id&gt; чтобы закрепить.")
         return
 
     all_items = await queries.get_items_page_with_nums(db, user_id, "pinned", limit=10000, offset=0)
@@ -1327,60 +1350,6 @@ async def cmd_unpin(message: types.Message, db=None):
         await message.reply(f"📌 Запись #{item_id} откреплена.")
     else:
         await message.reply(f"Запись #{item_id} не найдена.")
-
-
-# ── /readlist (clickable) ─────────────────────────────────
-
-@router.message(Command("readlist"))
-async def cmd_readlist(message: types.Message, db=None):
-    user_id = message.from_user.id
-    items = await queries.get_items_page_with_nums(db, user_id, "readlist", limit=PAGE_SIZE, offset=0)
-    if not items:
-        await message.reply("📖 Всё прочитано! Нет непрочитанных записей.")
-        return
-
-    all_items = await queries.get_items_page_with_nums(db, user_id, "readlist", limit=10000, offset=0)
-    total = len(all_items)
-
-    buttons = _clickable_list_buttons(items, "l", "0", 0, total)
-    buttons.append([_back_button_for_ctx("l")])
-
-    await message.reply(
-        f"📖 <b>Список чтения</b> ({total} непрочитанных)",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-
-
-@router.message(Command("markread"))
-async def cmd_markread(message: types.Message, db=None):
-    user_id = message.from_user.id
-    parts = message.text.split()
-    if len(parts) < 2:
-        await message.reply("Использование: /markread &lt;id&gt;")
-        return
-    try:
-        item_id = int(parts[1])
-    except ValueError:
-        await message.reply("ID должен быть числом.")
-        return
-
-    if await queries.mark_item_read(db, user_id, item_id):
-        await message.reply(f"✅ Запись #{item_id} отмечена как прочитанная.")
-    else:
-        await message.reply(f"Запись #{item_id} не найдена.")
-
-
-# ── /clearall ─────────────────────────────────────────────
-
-@router.message(Command("clearall"))
-async def cmd_clearall(message: types.Message, db=None):
-    user_id = message.from_user.id
-    count = await queries.mark_all_read(db, user_id)
-    if count > 0:
-        await message.reply(f"✅ Отмечено прочитанным: {count} записей.")
-    else:
-        await message.reply("📖 Всё уже прочитано!")
 
 
 # ── /map ──────────────────────────────────────────────────

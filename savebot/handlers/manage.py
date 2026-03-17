@@ -26,7 +26,7 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📂 Browse"), KeyboardButton(text="🔍 Search")],
         [KeyboardButton(text="📌 Pinned"), KeyboardButton(text="🕐 Recent")],
-        [KeyboardButton(text="📖 Read List"), KeyboardButton(text="⚙️ Settings")],
+        [KeyboardButton(text="⚙️ Settings")],
     ],
     resize_keyboard=True,
     is_persistent=True,
@@ -57,7 +57,6 @@ async def cmd_start(message: types.Message, **kwargs):
         "📂 Browse — просмотр по категориям\n"
         "🔍 Search — поиск по записям\n"
         "📌 Pinned / 🕐 Recent — закреплённые и последние\n"
-        "📖 Read List — список чтения\n"
         "⚙️ Settings — настройки\n\n"
         "ℹ️ Подробнее: /help",
         reply_markup=MAIN_KEYBOARD,

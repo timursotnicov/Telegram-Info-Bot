@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '📂 Telegram-Info-Bot context loaded. Key docs: docs/context-hub-dev-guide.md | Stack: aiogram v3, aiosqlite, OpenRouter API, APScheduler | Entry: savebot/bot.py'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Reminder: async-first codebase. DB ops via queries.py only. LLM calls use OpenRouter with fallbacks.'"
+          }
+        ]
+      }
+    ]
+  }
+}
