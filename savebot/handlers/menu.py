@@ -18,7 +18,7 @@ from savebot.db.state_store import get_state, set_state, delete_state
 router = Router()
 logger = logging.getLogger(__name__)
 
-BUTTON_TEXTS = {"📂 Browse", "🔍 Search", "📌 Pinned", "🕐 Recent", "📖 Read List", "⚙️ Settings"}
+BUTTON_TEXTS = {"📂 Browse", "🔍 Search", "📌 Pinned", "🕐 Recent", "⚙️ Settings"}
 
 
 # ── State dispatcher ──────────────────────────────────────
@@ -175,10 +175,6 @@ async def handle_keyboard_button(message: types.Message, db=None):
     elif text == "🕐 Recent":
         from savebot.handlers.browse import cmd_recent
         await cmd_recent(message, db=db)
-
-    elif text == "📖 Read List":
-        from savebot.handlers.browse import cmd_readlist
-        await cmd_readlist(message, db=db)
 
     elif text == "⚙️ Settings":
         from savebot.handlers.settings import cmd_settings

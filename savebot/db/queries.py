@@ -450,31 +450,28 @@ async def get_pinned_items(db: aiosqlite.Connection, user_id: int, limit: int = 
     return await _attach_tags(db, items)
 
 
-# ── Reading List ───────────────────────────────────────────
+# ── Sources (channels) ─────────────────────────────────────
 
-async def get_unread_items(db: aiosqlite.Connection, user_id: int, limit: int = 20) -> list[dict]:
+async def get_all_sources(db: aiosqlite.Connection, user_id: int) -> list[dict]:
+    """Get distinct sources with item counts, ordered by count DESC."""
     cursor = await db.execute(
-        "SELECT * FROM items WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT ?",
-        (user_id, limit),
+        """SELECT source, COUNT(*) as count
+           FROM items
+           WHERE user_id = ? AND source IS NOT NULL AND source != ''
+           GROUP BY source
+           ORDER BY count DESC""",
+        (user_id,),
     )
-    items = [dict(r) for r in await cursor.fetchall()]
-    return await _attach_tags(db, items)
+    return [dict(r) for r in await cursor.fetchall()]
 
 
-async def mark_item_read(db: aiosqlite.Connection, user_id: int, item_id: int) -> bool:
+async def count_items_by_source(db: aiosqlite.Connection, user_id: int, source: str) -> int:
+    """Count items from a specific source."""
     cursor = await db.execute(
-        "UPDATE items SET is_read = 1 WHERE id = ? AND user_id = ?", (item_id, user_id)
+        "SELECT COUNT(*) AS c FROM items WHERE user_id = ? AND source = ?",
+        (user_id, source),
     )
-    await db.commit()
-    return cursor.rowcount > 0
-
-
-async def mark_all_read(db: aiosqlite.Connection, user_id: int) -> int:
-    cursor = await db.execute(
-        "UPDATE items SET is_read = 1 WHERE user_id = ? AND is_read = 0", (user_id,)
-    )
-    await db.commit()
-    return cursor.rowcount
+    return (await cursor.fetchone())["c"]
 
 
 # ── Knowledge Map ──────────────────────────────────────────
@@ -684,8 +681,6 @@ def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, 
         return "i.user_id = ?", [], "i.created_at DESC"
     elif context_type == "pinned":
         return "i.is_pinned = 1 AND i.user_id = ?", [], "i.created_at DESC"
-    elif context_type == "readlist":
-        return "i.is_read = 0 AND i.user_id = ?", [], "i.created_at DESC"
     elif context_type == "forgotten":
         return (
             "i.is_pinned = 0 AND i.created_at < datetime('now', '-30 days') AND i.user_id = ?",
@@ -698,6 +693,8 @@ def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, 
             [context_id],
             "i.created_at DESC",
         )
+    elif context_type == "source":
+        return "i.source = ? AND i.user_id = ?", [context_id], "i.created_at DESC"
     else:
         raise ValueError(f"Unknown context_type: {context_type}")
 

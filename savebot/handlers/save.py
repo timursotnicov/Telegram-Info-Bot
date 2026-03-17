@@ -198,24 +198,20 @@ async def _process_content(message: types.Message, db):
             text += f"\n<i>{html.escape(ai_result['summary'])}</i>"
 
         # Find related items
-        related = await find_related_items(
-            db, item_id, user_id,
-            category_id=cat["id"],
-            tags=ai_result["tags"],
-            source=source,
-        )
-        if related:
-            text += "\n\n🔗 <b>Похожие записи:</b>"
-            for r in related:
-                r_summary = r.get("ai_summary") or r["content_text"][:60]
-                text += f"\n  #{r['id']} {r_summary}"
-
-        # Links are unread by default
-        if content_type == "link":
-            await db.execute(
-                "UPDATE items SET is_read = 0 WHERE id = ?", (item_id,)
+        try:
+            related = await find_related_items(
+                db, item_id, user_id,
+                category_id=cat["id"],
+                tags=ai_result["tags"],
+                source=source,
             )
-            await db.commit()
+            if related:
+                text += "\n\n🔗 <b>Похожие записи:</b>"
+                for r in related:
+                    r_summary = r.get("ai_summary") or r["content_text"][:60]
+                    text += f"\n  #{r['id']} {html.escape(r_summary)}"
+        except Exception:
+            logger.exception("find_related_items failed for item %d", item_id)
 
         await message.reply(text, reply_markup=_post_save_keyboard(item_id), parse_mode="HTML")
 
