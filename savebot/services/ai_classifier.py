@@ -16,19 +16,31 @@ SYSTEM_PROMPT = """\
 Categorize the content below. Respond with ONLY valid JSON, no markdown.
 
 Rules:
-1. Category: pick from existing list if it fits, otherwise create a NEW specific one (1-3 words).
-2. NEVER use generic categories: "Inbox", "Other", "General", "Misc", "Технологии", "Бизнес", "Наука", "Образование".
-   Use specific subtopics: "Искусственный интеллект", "Маркетинг", "Космос", "Веб-разработка" etc.
-3. Tags: 1-3, lowercase, use underscores not hyphens (e.g. "machine_learning" not "machine-learning").
-4. Summary: one sentence, same language as content.
-5. If content is a URL/link — categorize by the topic the link is about.
-6. If content is a forwarded message — categorize by the message topic, not by who sent it.
+1. Category: PREFER an existing category if the content fits. Create a NEW one only if nothing matches.
+   New categories: 1-3 words, specific topic (not generic).
+2. NEVER use generic categories: "Inbox", "Other", "General", "Misc", "Технологии", "Бизнес", "Наука", "Образование", "Разное", "Интересное".
+3. Tags: 1-3, lowercase, underscores (e.g. "machine_learning"). Match existing tags when possible.
+4. Summary: one sentence, same language as content. Capture the KEY idea, not just the topic.
+5. Emoji: pick ONE emoji that represents the category topic, not the content mood.
+6. URL/link → categorize by what the link is about.
+7. Forwarded message → categorize by message topic, ignore who sent it.
+8. Very short content (< 10 words) → still categorize by topic. Use tags to add context.
 
 JSON format:
 {"category": "Name", "emoji": "🔬", "tags": ["tag1", "tag2"], "summary": "Краткое описание"}
 
-Example input: "Статья про то, как нейросети помогают в диагностике рака"
-Example output: {"category": "Медицина и ИИ", "emoji": "🏥", "tags": ["нейросети", "диагностика", "медицина"], "summary": "Статья о применении нейросетей для диагностики рака"}
+Example 1:
+Input: "Статья про то, как нейросети помогают в диагностике рака"
+Output: {"category": "Медицина и ИИ", "emoji": "🏥", "tags": ["нейросети", "диагностика", "медицина"], "summary": "Применение нейросетей в диагностике рака"}
+
+Example 2:
+Input: "https://blog.example.com/how-to-invest-in-etf-2026"
+Output: {"category": "Инвестиции", "emoji": "📈", "tags": ["etf", "инвестиции"], "summary": "Руководство по инвестированию в ETF на 2026 год"}
+
+Example 3 (BAD — do NOT do this):
+Input: "Рецепт шарлотки с яблоками"
+BAD output: {"category": "Разное", ...} ← generic category
+GOOD output: {"category": "Рецепты", "emoji": "🍰", "tags": ["выпечка", "рецепт"], "summary": "Рецепт яблочной шарлотки"}
 """
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"

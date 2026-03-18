@@ -20,28 +20,39 @@ Parse a search query into structured JSON filters. Today: {today}. Respond with 
 Format: {{"keywords": ["word1"], "date_from": "YYYY-MM-DD or null", "date_to": "YYYY-MM-DD or null", "category_hint": "or null", "tag_hint": "or null"}}
 
 Rules:
-- keywords: 1-4 main search terms, keep original language.
-- date_from/date_to: only if time is mentioned. null otherwise.
+- keywords: 1-4 main search terms in the ORIGINAL language. Extract the core topic, drop filler words.
+- date_from/date_to: only if time is explicitly mentioned. null otherwise.
   - "за последнюю неделю" / "last week" = 7 days ago → today
   - "вчера" / "yesterday" = yesterday → yesterday
+  - "позавчера" / "day before yesterday" = 2 days ago → 2 days ago
+  - "за последние N дней" = N days ago → today
   - "в январе" / "in January" = Jan 1 → Jan 31 (current year)
   - "за последний месяц" = 30 days ago → today
-- category_hint/tag_hint: only if explicitly mentioned. null otherwise.
-- When unsure, use null. Wrong filters are worse than missing filters.
+  - "в этом году" = Jan 1 → today
+- category_hint/tag_hint: only if the user explicitly names a category or tag. null otherwise.
+- When unsure, use null. Wrong filters are WORSE than missing filters.
 
-Example: "статьи про нейросети за последнюю неделю"
+Example 1: "статьи про нейросети за последнюю неделю"
 Output: {{"keywords": ["нейросети", "статьи"], "date_from": "{example_week_ago}", "date_to": "{today}", "category_hint": null, "tag_hint": null}}
+
+Example 2: "что я сохранял про инвестиции"
+Output: {{"keywords": ["инвестиции"], "date_from": null, "date_to": null, "category_hint": "Инвестиции", "tag_hint": null}}
 """
 
 SYNTHESIZE_PROMPT = """\
 Answer the user's question using ONLY the saved items provided below. Do NOT invent information.
 
 Rules:
-1. Reference items by ID: (см. #42, #17) or (see #42, #17).
-2. When referencing an item, include a brief quote from it in the format: > quote (см. #42)
-3. If items don't have enough info — say so honestly, don't guess.
-4. Keep answer concise: 3-5 sentences.
-5. Answer in the SAME language as the user's question (usually Russian).
+1. Reference items by their ID: (см. #42, #17).
+2. Start with a direct answer to the question, then support with references.
+3. If items don't have enough info — say so honestly. Never guess or add external knowledge.
+4. Be concise: match answer length to question complexity. Simple question → 1-2 sentences. Complex → up to 5.
+5. Answer in the SAME language as the user's question.
+
+Example:
+Question: "что я знаю про ETF?"
+Items: #12: Руководство по ETF [...], #34: Сравнение ETF и акций [...]
+Answer: У тебя есть руководство по инвестированию в ETF (см. #12) и сравнение ETF с отдельными акциями (см. #34).
 """
 
 
@@ -135,7 +146,7 @@ async def synthesize_answer(question: str, items: list[dict]) -> str | None:
 
     # Build context from items
     context_parts = []
-    for item in items[:15]:
+    for item in items[:30]:
         summary = item.get("ai_summary") or item.get("content_text", "")[:200]
         tags = " ".join(f"#{t}" for t in item.get("tags", []))
         date = str(item.get("created_at", ""))[:10]
