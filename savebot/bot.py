@@ -27,7 +27,6 @@ async def set_bot_commands(bot: Bot):
     commands = [
         BotCommand(command="browse", description="Навигация по записям"),
         BotCommand(command="search", description="Поиск"),
-        BotCommand(command="ask", description="Спросить AI"),
         BotCommand(command="recent", description="Последние записи"),
         BotCommand(command="help", description="Помощь"),
     ]
