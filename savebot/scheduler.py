@@ -1,6 +1,7 @@
 """Scheduler for periodic tasks (digests, cleanup)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -15,6 +16,10 @@ from savebot.db.state_store import cleanup_expired
 from savebot.services.digest import generate_weekly_digest, send_daily_brief
 
 logger = logging.getLogger(__name__)
+
+JOB_TIMEOUT_DIGEST = 120  # seconds
+JOB_TIMEOUT_BRIEF = 60
+JOB_TIMEOUT_CLEANUP = 30
 
 _scheduler: AsyncIOScheduler | None = None
 
@@ -83,6 +88,33 @@ async def _cleanup_states(db_path: str):
         await db.close()
 
 
+async def _send_digests_safe(bot: Bot, db_path: str):
+    try:
+        await asyncio.wait_for(_send_digests(bot, db_path), timeout=JOB_TIMEOUT_DIGEST)
+    except asyncio.TimeoutError:
+        logger.error("Digest job timed out after %ds", JOB_TIMEOUT_DIGEST)
+    except Exception as e:
+        logger.error("Digest job failed: %s", e)
+
+
+async def _check_daily_briefs_safe(bot: Bot, db_path: str):
+    try:
+        await asyncio.wait_for(_check_daily_briefs(bot, db_path), timeout=JOB_TIMEOUT_BRIEF)
+    except asyncio.TimeoutError:
+        logger.error("Daily brief job timed out after %ds", JOB_TIMEOUT_BRIEF)
+    except Exception as e:
+        logger.error("Daily brief job failed: %s", e)
+
+
+async def _cleanup_states_safe(db_path: str):
+    try:
+        await asyncio.wait_for(_cleanup_states(db_path), timeout=JOB_TIMEOUT_CLEANUP)
+    except asyncio.TimeoutError:
+        logger.error("Cleanup job timed out after %ds", JOB_TIMEOUT_CLEANUP)
+    except Exception as e:
+        logger.error("Cleanup job failed: %s", e)
+
+
 def start_scheduler(bot: Bot, db_path: str):
     """Start the async scheduler with digest and cleanup jobs."""
     global _scheduler
@@ -90,7 +122,7 @@ def start_scheduler(bot: Bot, db_path: str):
 
     # Daily check at 10:00 — sends digest only to users whose chosen day is today
     _scheduler.add_job(
-        _send_digests,
+        _send_digests_safe,
         CronTrigger(hour=10, minute=0),
         args=[bot, db_path],
         id="daily_digest_check",
@@ -99,7 +131,7 @@ def start_scheduler(bot: Bot, db_path: str):
 
     # Hourly check for daily briefs — sends to users whose chosen hour matches
     _scheduler.add_job(
-        _check_daily_briefs,
+        _check_daily_briefs_safe,
         CronTrigger(minute=0),
         args=[bot, db_path],
         id="daily_brief_check",
@@ -108,7 +140,7 @@ def start_scheduler(bot: Bot, db_path: str):
 
     # Cleanup expired pending states — every hour
     _scheduler.add_job(
-        _cleanup_states,
+        _cleanup_states_safe,
         IntervalTrigger(hours=1),
         args=[db_path],
         id="cleanup_states",

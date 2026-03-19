@@ -66,6 +66,22 @@ MIGRATIONS = [
     """
     ALTER TABLE user_preferences ADD COLUMN daily_brief_time TEXT DEFAULT '09:00';
     """,
+    # Migration 15-19: Performance indexes
+    """
+    CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at DESC);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_items_url ON items(url) WHERE url IS NOT NULL;
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_pending_states_user ON pending_states(user_id);
+    """,
 ]
 
 async def run_migrations(db: aiosqlite.Connection):
@@ -82,6 +98,7 @@ async def run_migrations(db: aiosqlite.Connection):
     for i, sql in enumerate(MIGRATIONS, start=1):
         if i > current:
             try:
+                # SQLite auto-commits each statement; commit() finalises the transaction
                 await db.execute(sql)
                 await db.execute("INSERT INTO schema_version (version) VALUES (?)", (i,))
                 await db.commit()
