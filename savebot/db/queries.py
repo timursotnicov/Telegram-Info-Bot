@@ -153,6 +153,24 @@ async def merge_categories(db: aiosqlite.Connection, user_id: int, source_id: in
     return affected
 
 
+async def delete_empty_non_default_categories(db: aiosqlite.Connection, user_id: int) -> int:
+    """Delete categories with 0 items, keeping the 7 defaults."""
+    default_names = [name for name, _ in DEFAULT_CATEGORIES]
+    placeholders = ",".join("?" * len(default_names))
+    cursor = await db.execute(
+        f"""DELETE FROM categories
+            WHERE user_id = ?
+            AND name NOT IN ({placeholders})
+            AND id NOT IN (
+                SELECT DISTINCT category_id FROM items
+                WHERE category_id IS NOT NULL AND user_id = ?
+            )""",
+        [user_id] + default_names + [user_id],
+    )
+    await db.commit()
+    return cursor.rowcount
+
+
 # ── Items ───────────────────────────────────────────────────
 
 async def save_item(

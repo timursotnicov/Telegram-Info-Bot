@@ -115,6 +115,30 @@ async def _cleanup_states_safe(db_path: str):
         logger.error("Cleanup job failed: %s", e)
 
 
+async def _cleanup_empty_categories(db_path: str):
+    """Delete empty non-default categories for all users."""
+    db = await aiosqlite.connect(db_path)
+    db.row_factory = aiosqlite.Row
+    try:
+        cursor = await db.execute("SELECT DISTINCT user_id FROM categories")
+        users = [row["user_id"] for row in await cursor.fetchall()]
+        for uid in users:
+            deleted = await queries.delete_empty_non_default_categories(db, uid)
+            if deleted:
+                logger.info("Cleaned %d empty categories for user %d", deleted, uid)
+    finally:
+        await db.close()
+
+
+async def _cleanup_empty_categories_safe(db_path: str):
+    try:
+        await asyncio.wait_for(_cleanup_empty_categories(db_path), timeout=JOB_TIMEOUT_CLEANUP)
+    except asyncio.TimeoutError:
+        logger.error("Category cleanup timed out after %ds", JOB_TIMEOUT_CLEANUP)
+    except Exception as e:
+        logger.error("Category cleanup failed: %s", e)
+
+
 def start_scheduler(bot: Bot, db_path: str):
     """Start the async scheduler with digest and cleanup jobs."""
     global _scheduler
@@ -144,6 +168,15 @@ def start_scheduler(bot: Bot, db_path: str):
         IntervalTrigger(hours=1),
         args=[db_path],
         id="cleanup_states",
+        replace_existing=True,
+    )
+
+    # Cleanup empty non-default categories — daily at 3:00 AM
+    _scheduler.add_job(
+        _cleanup_empty_categories_safe,
+        CronTrigger(hour=3, minute=0),
+        args=[db_path],
+        id="cleanup_empty_categories",
         replace_existing=True,
     )
 

@@ -1319,6 +1319,65 @@ async def test_find_duplicate_by_tg_message_id(db):
     assert dup["tg_message_id"] == 55555
 
 
+# ── delete_empty_non_default_categories ─────────────────
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_removes_empty(db):
+    """Empty non-default category should be deleted."""
+    await queries.get_or_create_category(db, USER_ID, "OldStuff", "📦")
+    deleted = await queries.delete_empty_non_default_categories(db, USER_ID)
+    assert deleted == 1
+    cats = await queries.get_all_categories(db, USER_ID)
+    assert not any(c["name"] == "OldStuff" for c in cats)
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_keeps_defaults(db):
+    """Empty default categories must NOT be deleted."""
+    await queries.ensure_default_categories(db, USER_ID)
+    deleted = await queries.delete_empty_non_default_categories(db, USER_ID)
+    assert deleted == 0
+    cats = await queries.get_all_categories(db, USER_ID)
+    assert len(cats) == 7
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_keeps_with_items(db):
+    """Non-default category WITH items should be kept."""
+    cat = await queries.get_or_create_category(db, USER_ID, "HasItems", "📦")
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="keep me", tags=[])
+    deleted = await queries.delete_empty_non_default_categories(db, USER_ID)
+    assert deleted == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_user_isolation(db):
+    """User A cleanup should not touch user B's empty categories."""
+    await queries.get_or_create_category(db, USER_ID, "UserA_Empty", "📦")
+    await queries.get_or_create_category(db, OTHER_USER, "UserB_Empty", "📦")
+    await queries.delete_empty_non_default_categories(db, USER_ID)
+    # User B's category should still exist
+    cat = await queries.get_category_by_name(db, OTHER_USER, "UserB_Empty")
+    assert cat is not None
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_returns_count(db):
+    """Should return the number of deleted categories."""
+    await queries.get_or_create_category(db, USER_ID, "Empty1", "📦")
+    await queries.get_or_create_category(db, USER_ID, "Empty2", "📦")
+    deleted = await queries.delete_empty_non_default_categories(db, USER_ID)
+    assert deleted == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_empty_non_default_no_error_on_empty(db):
+    """Should return 0 when user has no categories at all."""
+    deleted = await queries.delete_empty_non_default_categories(db, USER_ID)
+    assert deleted == 0
+
+
 def test_escape_fts5_basic():
     result = queries._escape_fts5(["hello", "world"])
     assert result == '"hello" "world"'
