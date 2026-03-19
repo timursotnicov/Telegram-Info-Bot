@@ -1,67 +1,56 @@
-# Telegram-Info-Bot
+# SaveBot (@My_Saves_AI_Bot)
 
-## Project Overview
+Personal knowledge base Telegram bot.
+Python 3.12 + aiogram 3.26 + aiosqlite + OpenRouter API
 
-Personal knowledge management bot for Telegram. Saves messages, classifies them with AI,
-and provides intelligent search across saved content.
+## Commands
+- `python -m pytest tests/` — run all tests
+- Deploy: SSH to server (see deploy/ and /deploy skill)
+- NEVER run the bot locally — deploy to server only (causes polling conflicts)
 
-## Tech Stack
+## Architecture
+- Router order in bot.py: settings → manage → menu → browse → inline → save (ORDER MATTERS!)
+- State management: custom state_store (pending_states table in DB)
+- AI: OpenRouter API → gemma-3-27b-it:free (with fallback chain: trinity, gemma-12b, qwen3)
+- DB: aiosqlite, 9 tables, 15 migrations
+- Scheduler: hourly jobs (digest, daily brief, state cleanup)
 
-- **Python 3.10+** with async/await
-- **aiogram v3** — Telegram Bot Framework (routers, filters, middleware)
-- **aiosqlite** — async SQLite with FTS5 for full-text search
-- **OpenRouter API** — LLM calls (classification, search, OCR)
-- **APScheduler** — periodic tasks (digests, cleanup)
+## Where to Look
+| Topic | File |
+|-------|------|
+| Architecture decisions | @docs/decisions/ |
+| Callback conventions | @.conventions/gold-standards/callback-pattern.md |
+| Handler pattern | @.conventions/gold-standards/handler.py |
+| Query pattern | @.conventions/gold-standards/query.py |
+| State pattern | @.conventions/gold-standards/state-pattern.py |
+| Anti-patterns | @.conventions/anti-patterns/callback-data.md |
+| Deploy script | @deploy/setup.sh |
+| Structural tests | @tests/test_architecture.py |
 
-## Project Structure
+## Enforced Rules (tested mechanically)
+- Router order enforced by `tests/test_architecture.py::TestRouterOrder`
+- Callback data ≤ 64 bytes enforced by `tests/test_architecture.py::TestCallbackDataLimit`
 
-```
-savebot/
-├── bot.py              # Entry point, dispatcher setup
-├── config.py           # Environment-based configuration
-├── middleware.py        # Error handling middleware
-├── scheduler.py         # APScheduler jobs
-├── db/
-│   ├── models.py       # SQLite schema & migrations
-│   ├── queries.py      # All database operations
-│   └── state_store.py  # Temporary state for multi-step flows
-├── services/
-│   ├── ai_classifier.py  # Content categorization via LLM
-│   ├── ai_search.py      # Query parsing & answer synthesis
-│   ├── ocr.py             # Vision-based text extraction
-│   ├── link_preview.py    # URL metadata fetching
-│   ├── digest.py          # Weekly/daily digest generation
-│   └── connections.py     # Related items discovery
-└── handlers/
-    ├── save.py          # Message capture & auto-save
-    ├── browse.py        # Category/tag/context browsing
-    ├── manage.py        # /start, /help, /stats, /export
-    ├── menu.py          # Persistent keyboard & state
-    ├── settings.py      # User preferences
-    └── inline.py        # Inline queries
-```
+## Callback Data Rules
+- Max 64 bytes per callback_data (Telegram limit)
+- Prefixes: bm: (browse menu), vi: (view item), vn: (navigate), vl: (view list), va: (view action)
+- Context codes: c=category, t=tag, r=recent, p=pinned, l=readlist, f=forgotten, o=collection
+- Truncate tags to 20 chars in callbacks
 
-## Key Conventions
+## Gotchas
+- gemma model does NOT support system role — merge system prompt into user message
+- Empty dict is falsy in Python — use `is not None` checks
+- aiogram Message objects are frozen — cannot mutate fields
+- Callback data > 64 bytes → TelegramBadRequest crash
+- Always truncate tag text to 20 chars in callback data
 
-- All I/O is async (use `await`, `async def`)
-- Database operations go through `savebot/db/queries.py` — never write raw SQL in handlers
-- LLM calls use OpenRouter with retry logic and model fallbacks (see `ai_classifier.py`)
-- Handlers are organized as aiogram Routers, registered in `bot.py`
-- User-facing text supports Russian and English
-- Before modifying AI prompts, read existing prompts in services/ to maintain consistency
-
-## Context Hub
-
-This project uses Context Hub for providing up-to-date documentation to AI agents during development.
-See `docs/context-hub-dev-guide.md` for details.
-
-When working on this codebase, refer to project documentation in `docs/` for:
-- API integration patterns (OpenRouter, Telegram)
-- Database schema and FTS5 query syntax
-- AI prompt engineering guidelines
+## Rules
+- Tests required for all query functions and services
+- Deploy ONLY via SSH to server (ubuntu@151.145.86.66)
+- Register new handlers in bot.py in correct router order
+- New callback prefixes must follow conventions in .conventions/
 
 # gstack
-
 - For all web browsing, use the /browse skill from gstack. Never use mcp__claude-in-chrome__* tools.
 - Available gstack skills:
   - /plan-ceo-review — CEO/founder-mode plan review
