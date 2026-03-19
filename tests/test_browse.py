@@ -9,7 +9,10 @@ from savebot.handlers.browse import (
     _format_item_short,
     _clickable_list_buttons,
     _extract_list_context,
+    _more_markup,
+    _categories_markup,
     cmd_browse,
+    cmd_ask,
     on_hub,
     on_hub_cats,
     on_list_delete_confirm,
@@ -304,3 +307,42 @@ class TestActionDeleteCancel:
         cb.answer.assert_called_once_with("Отменено")
         call_text = cb.message.edit_text.call_args[0][0]
         assert "отменено" in call_text.lower()
+
+
+# ── _more_markup ──────────────────────────────────────────
+
+class TestMoreMarkup:
+    def test_more_markup_no_forgotten(self):
+        markup = _more_markup()
+        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
+        for text in all_texts:
+            assert "Забытые" not in text, "More menu should not contain 'Забытые'"
+
+    def test_more_markup_no_channels(self):
+        markup = _more_markup()
+        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
+        for text in all_texts:
+            assert "Каналы" not in text, "More menu should not contain 'Каналы'"
+
+
+# ── _categories_markup ────────────────────────────────────
+
+class TestCategoriesMarkup:
+    def test_categories_markup_no_tags(self):
+        cats = [{"id": 1, "name": "Work", "emoji": "💼", "item_count": 3}]
+        markup = _categories_markup(cats)
+        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
+        for text in all_texts:
+            assert "Теги" not in text, "Category markup footer should not contain 'Теги'"
+
+
+# ── cmd_ask ───────────────────────────────────────────────
+
+class TestCmdAsk:
+    @pytest.mark.asyncio
+    async def test_ask_command_disabled(self, db):
+        msg = make_message(USER_ID, text="/ask something")
+        await cmd_ask(msg, db=db)
+        msg.reply.assert_called_once()
+        reply_text = msg.reply.call_args[0][0]
+        assert "временно отключена" in reply_text
