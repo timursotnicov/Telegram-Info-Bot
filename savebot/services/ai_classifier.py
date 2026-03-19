@@ -13,34 +13,36 @@ from savebot.config import config
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
-Categorize the content below. Respond with ONLY valid JSON, no markdown.
+Pick the BEST matching category from the list below. Respond with ONLY valid JSON, no markdown.
+
+You MUST choose one from this list. Do NOT create new categories.
+If nothing fits well, use "Разное".
 
 Rules:
-1. Category: PREFER an existing category if the content fits. Create a NEW one only if nothing matches.
-   New categories: 1-3 words, specific topic (not generic).
-2. NEVER use generic categories: "Inbox", "Other", "General", "Misc", "Технологии", "Бизнес", "Наука", "Образование", "Разное", "Интересное".
-3. Tags: 1-3, lowercase, underscores (e.g. "machine_learning"). Match existing tags when possible.
-4. Summary: one sentence, same language as content. Capture the KEY idea, not just the topic.
-5. Emoji: pick ONE emoji that represents the category topic, not the content mood.
-6. URL/link → categorize by what the link is about.
-7. Forwarded message → categorize by message topic, ignore who sent it.
-8. Very short content (< 10 words) → still categorize by topic. Use tags to add context.
+1. Tags: 1-3, lowercase, underscores (e.g. "machine_learning"). Match existing tags when possible.
+2. Summary: one sentence, same language as content. Capture the KEY idea, not just the topic.
+3. Emoji: pick ONE emoji that represents the category topic, not the content mood.
+4. URL/link → categorize by what the link is about.
+5. Forwarded message → categorize by message topic, ignore who sent it.
+6. Very short content (< 10 words) → still categorize by topic. Use tags to add context.
 
 JSON format:
 {"category": "Name", "emoji": "🔬", "tags": ["tag1", "tag2"], "summary": "Краткое описание"}
 
 Example 1:
 Input: "Статья про то, как нейросети помогают в диагностике рака"
-Output: {"category": "Медицина и ИИ", "emoji": "🏥", "tags": ["нейросети", "диагностика", "медицина"], "summary": "Применение нейросетей в диагностике рака"}
+Categories: 💻 Технологии, 💰 Финансы, 🏋️ Здоровье, 📚 Обучение, 🏢 Работа, 🎨 Творчество, 📥 Разное
+Output: {"category": "Технологии", "emoji": "💻", "tags": ["нейросети", "диагностика", "медицина"], "summary": "Применение нейросетей в диагностике рака"}
 
 Example 2:
 Input: "https://blog.example.com/how-to-invest-in-etf-2026"
-Output: {"category": "Инвестиции", "emoji": "📈", "tags": ["etf", "инвестиции"], "summary": "Руководство по инвестированию в ETF на 2026 год"}
+Categories: 💻 Технологии, 💰 Финансы, 🏋️ Здоровье, 📚 Обучение, 🏢 Работа, 🎨 Творчество, 📥 Разное
+Output: {"category": "Финансы", "emoji": "💰", "tags": ["etf", "инвестиции"], "summary": "Руководство по инвестированию в ETF на 2026 год"}
 
-Example 3 (BAD — do NOT do this):
+Example 3:
 Input: "Рецепт шарлотки с яблоками"
-BAD output: {"category": "Разное", ...} ← generic category
-GOOD output: {"category": "Рецепты", "emoji": "🍰", "tags": ["выпечка", "рецепт"], "summary": "Рецепт яблочной шарлотки"}
+Categories: 💻 Технологии, 💰 Финансы, 🏋️ Здоровье, 📚 Обучение, 🏢 Работа, 🎨 Творчество, 📥 Разное
+Output: {"category": "Разное", "emoji": "📥", "tags": ["выпечка", "рецепт"], "summary": "Рецепт яблочной шарлотки"}
 """
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -120,7 +122,7 @@ async def classify_content(
 
             result = json.loads(text)
             return {
-                "category": result.get("category", "Inbox"),
+                "category": result.get("category", "Разное"),
                 "emoji": result.get("emoji", "📁"),
                 "tags": [t.replace("-", "_") for t in result.get("tags", [])[:3]],
                 "summary": result.get("summary", ""),

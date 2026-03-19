@@ -1,4 +1,38 @@
-"""Database query functions."""
+"""Database query functions.
+
+Sections and key functions:
+─────────────────────────────────────────────────
+Lines ~11-13   Allowed preference keys (_ALLOWED_PREF_KEYS)
+Lines ~16-23   Helper: _attach_tags
+Lines ~26-50   Default categories: DEFAULT_CATEGORIES, ensure_default_categories
+Lines ~53-119  Categories: get_or_create_category, get_or_create_inbox_category,
+               get_category_by_name, get_all_categories, rename_category,
+               delete_category, merge_categories
+Lines ~122-278 Items: save_item, get_item, get_items_by_category, get_items_by_tag,
+               search_items, get_recent_items, update_item_category,
+               update_item_tags, update_item_note, delete_item, find_duplicate
+Lines ~281-293 Tags: get_all_tags
+Lines ~296-308 Stats: get_stats
+Lines ~311-346 Export & counts: export_all, count_items_by_category,
+               count_items_in_category
+Lines ~349-369 User preferences: get_user_preferences, update_user_preference
+Lines ~372-443 Weekly/Digest: get_items_this_week, get_items_on_this_week,
+               get_weekly_stats, get_all_users_with_digest, log_digest, _escape_fts5
+Lines ~445-498 Filtered search: search_items_filtered
+Lines ~501-525 Pin/Favorites: pin_item, unpin_item, get_pinned_items
+Lines ~528-549 Sources: get_all_sources, count_items_by_source
+Lines ~552-637 Knowledge map & related: get_category_tag_map, get_forgotten_items,
+               get_items_with_shared_tags, get_items_in_same_category,
+               get_similar_items_fts
+Lines ~640-740 Collections: create_collection, get_collections, get_collection_items,
+               add_to_collection, remove_from_collection, delete_collection,
+               count_collection_items
+Lines ~743-860 Navigation: _context_sql, get_adjacent_item_ids,
+               get_items_page_with_nums, count_items_by_tag, create_category_manual
+Lines ~863-923 Daily brief: get_items_saved_yesterday, get_items_on_this_day,
+               get_weekly_category_stats, get_inbox_count,
+               get_all_users_with_daily_brief
+"""
 
 from __future__ import annotations
 
@@ -23,6 +57,33 @@ async def _attach_tags(db: aiosqlite.Connection, items: list[dict]) -> list[dict
     return items
 
 
+# ── Default Categories ─────────────────────────────────────
+
+DEFAULT_CATEGORIES = [
+    ("Технологии", "💻"),
+    ("Финансы", "💰"),
+    ("Здоровье", "🏋️"),
+    ("Обучение", "📚"),
+    ("Работа", "🏢"),
+    ("Творчество", "🎨"),
+    ("Разное", "📥"),
+]
+
+
+async def ensure_default_categories(db: aiosqlite.Connection, user_id: int) -> None:
+    """Create 7 default categories if user has none. Safe to call on every save."""
+    try:
+        cursor = await db.execute("SELECT COUNT(*) as c FROM categories WHERE user_id = ?", (user_id,))
+        count = (await cursor.fetchone())["c"]
+        if count > 0:
+            return
+        for name, emoji in DEFAULT_CATEGORIES:
+            await get_or_create_category(db, user_id, name, emoji)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("ensure_default_categories failed for user %d", user_id, exc_info=True)
+
+
 # ── Categories ──────────────────────────────────────────────
 
 async def get_or_create_category(db: aiosqlite.Connection, user_id: int, name: str, emoji: str = "\U0001f4c1") -> dict:
@@ -40,6 +101,15 @@ async def get_or_create_category(db: aiosqlite.Connection, user_id: int, name: s
 async def get_or_create_inbox_category(db: aiosqlite.Connection, user_id: int) -> dict:
     """Get or create the special 'Inbox' category for quick capture."""
     return await get_or_create_category(db, user_id, "Inbox", "📥")
+
+
+async def get_category_by_name(db: aiosqlite.Connection, user_id: int, name: str) -> dict | None:
+    """Get a category by exact name match."""
+    cursor = await db.execute(
+        "SELECT * FROM categories WHERE name = ? AND user_id = ?", (name, user_id)
+    )
+    row = await cursor.fetchone()
+    return dict(row) if row else None
 
 
 async def get_all_categories(db: aiosqlite.Connection, user_id: int) -> list[dict]:
@@ -208,15 +278,38 @@ async def delete_item(db: aiosqlite.Connection, user_id: int, item_id: int) -> b
     return cursor.rowcount > 0
 
 
-async def find_duplicate(db: aiosqlite.Connection, user_id: int, content_text: str, url: str | None = None) -> dict | None:
+async def find_duplicate(
+    db: aiosqlite.Connection, user_id: int, content_text: str,
+    url: str | None = None, forward_url: str | None = None, tg_message_id: int | None = None,
+) -> dict | None:
+    # Check forward_url first (most specific for forwarded posts)
+    if forward_url:
+        cursor = await db.execute(
+            "SELECT * FROM items WHERE forward_url = ? AND user_id = ?", (forward_url, user_id)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+    # Check tg_message_id
+    if tg_message_id:
+        cursor = await db.execute(
+            "SELECT * FROM items WHERE tg_message_id = ? AND user_id = ?", (tg_message_id, user_id)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+    # Existing checks
     if url:
         cursor = await db.execute("SELECT * FROM items WHERE url = ? AND user_id = ?", (url, user_id))
         row = await cursor.fetchone()
         if row:
             return dict(row)
-    cursor = await db.execute("SELECT * FROM items WHERE content_text = ? AND user_id = ?", (content_text, user_id))
-    row = await cursor.fetchone()
-    return dict(row) if row else None
+    if content_text:
+        cursor = await db.execute("SELECT * FROM items WHERE content_text = ? AND user_id = ?", (content_text, user_id))
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+    return None
 
 
 # ── Tags ────────────────────────────────────────────────────
@@ -262,6 +355,22 @@ async def export_all(db: aiosqlite.Connection, user_id: int) -> list[dict]:
     )
     items = [dict(r) for r in await cursor.fetchall()]
     return await _attach_tags(db, items)
+
+
+async def count_items_by_category(db: aiosqlite.Connection, user_id: int, category_id: int | None = None) -> int:
+    """Count items without loading them all into memory."""
+    if category_id:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM items WHERE user_id = ? AND category_id = ?",
+            (user_id, category_id),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM items WHERE user_id = ?",
+            (user_id,),
+        )
+    row = await cursor.fetchone()
+    return row[0]
 
 
 async def count_items_in_category(db: aiosqlite.Connection, user_id: int, category_id: int) -> int:
