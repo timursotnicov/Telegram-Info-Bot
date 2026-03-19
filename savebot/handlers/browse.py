@@ -35,6 +35,28 @@ _CTX_TITLES = {
 }
 
 
+# ── Sort ──────────────────────────────────────────────────
+
+SORT_LABELS = {
+    "d": "\U0001f554 \u041d\u043e\u0432\u044b\u0435",
+    "p": "\U0001f4cc \u0417\u0430\u043a\u0440\u0435\u043f",
+    "a": "\U0001f524 A-Z",
+    "s": "\U0001f4e8 \u041a\u0430\u043d\u0430\u043b",
+}
+
+
+def _sort_buttons(cat_id: int, active_sort: str = "d") -> list[InlineKeyboardButton]:
+    """Build sort option buttons for category view."""
+    row = []
+    for key, label in SORT_LABELS.items():
+        mark = "\u2705 " if key == active_sort else ""
+        row.append(InlineKeyboardButton(
+            text=f"{mark}{label}",
+            callback_data=f"browse_cat:{cat_id}:0:{key}",
+        ))
+    return row
+
+
 # ── Helpers ────────────────────────────────────────────────
 
 def _truncate_tag(tag: str, max_len: int = 20) -> str:
@@ -119,6 +141,7 @@ def _clickable_list_buttons(
     offset: int,
     total: int,
     deleting_item_id: int | None = None,
+    sort_by: str = "d",
 ) -> list[list[InlineKeyboardButton]]:
     """Build clickable item buttons + pagination for a list view."""
     buttons = []
@@ -153,13 +176,13 @@ def _clickable_list_buttons(
     if offset > 0:
         nav.append(InlineKeyboardButton(
             text="⬅️",
-            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset - PAGE_SIZE}",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset - PAGE_SIZE}:{sort_by}",
         ))
     nav.append(InlineKeyboardButton(text=f"Стр. {page}/{total_pages}", callback_data="noop"))
     if offset + PAGE_SIZE < total:
         nav.append(InlineKeyboardButton(
             text="➡️",
-            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset + PAGE_SIZE}",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset + PAGE_SIZE}:{sort_by}",
         ))
     if nav:
         buttons.append(nav)
@@ -472,7 +495,7 @@ async def on_hub_newcat(callback: types.CallbackQuery, db=None):
 
 # ── Clickable List View ───────────────────────────────────
 
-async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: str | int, offset: int, db=None, deleting_item_id: int | None = None):
+async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: str | int, offset: int, db=None, deleting_item_id: int | None = None, sort_by: str = "d"):
     """Show a clickable item list for any context."""
     if db is None:
         db = callback.bot.get("db")
@@ -481,7 +504,7 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
 
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type, context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
-        limit=PAGE_SIZE, offset=offset,
+        limit=PAGE_SIZE, offset=offset, sort_by=sort_by,
     )
 
     if not items:
@@ -528,7 +551,9 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     else:
         title = f"{title} ({total})"
 
-    buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id)
+    buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id, sort_by=sort_by)
+    if context_type == "category":
+        buttons.insert(0, _sort_buttons(int(ctx_id), sort_by))
     buttons.append([_back_button_for_ctx(ctx_short)])
 
     await callback.message.edit_text(
@@ -544,7 +569,8 @@ async def on_browse_category(callback: types.CallbackQuery, db=None):
     parts = callback.data.split(":")
     cat_id = parts[1]
     offset = int(parts[2])
-    await _show_list(callback, "category", cat_id, offset, db=db)
+    sort_by = parts[3] if len(parts) > 3 else "d"
+    await _show_list(callback, "category", cat_id, offset, db=db, sort_by=sort_by)
 
 
 @router.callback_query(F.data.startswith("tag_items:"))
@@ -565,13 +591,14 @@ async def on_tags_back(callback: types.CallbackQuery, db=None):
 
 @router.callback_query(F.data.startswith("vl:"))
 async def on_list_page(callback: types.CallbackQuery, db=None):
-    # vl:{ctx_short}:{ctx_id}:{offset}
+    # vl:{ctx_short}:{ctx_id}:{offset}:{sort_by}
     parts = callback.data.split(":")
     ctx_short = parts[1]
     ctx_id = parts[2]
     offset = int(parts[3])
+    sort_by = parts[4] if len(parts) > 4 else "d"
     context_type = _CTX_REV.get(ctx_short, "recent")
-    await _show_list(callback, context_type, ctx_id, offset, db=db)
+    await _show_list(callback, context_type, ctx_id, offset, db=db, sort_by=sort_by)
 
 
 @router.callback_query(F.data.startswith("vd:"))
@@ -582,8 +609,11 @@ async def on_list_delete(callback: types.CallbackQuery, db=None):
     ctx_id = parts[2]
     item_id = int(parts[3])
     offset = int(parts[4])
+    # Extract sort_by from vl: button on current keyboard
+    ctx = _extract_list_context(callback)
+    sort_by = ctx[3] if ctx else "d"
     context_type = _CTX_REV.get(ctx_short, "recent")
-    await _show_list(callback, context_type, ctx_id, offset, db=db, deleting_item_id=item_id)
+    await _show_list(callback, context_type, ctx_id, offset, db=db, deleting_item_id=item_id, sort_by=sort_by)
 
 
 @router.callback_query(F.data.startswith("vy:"))
@@ -595,6 +625,9 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     item_id = int(parts[3])
     offset = int(parts[4])
     user_id = callback.from_user.id
+    # Extract sort_by from vl: button on current keyboard
+    ctx = _extract_list_context(callback)
+    sort_by = ctx[3] if ctx else "d"
 
     if db is None:
         db = callback.bot.get("db")
@@ -612,7 +645,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
         context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
-        limit=PAGE_SIZE, offset=offset,
+        limit=PAGE_SIZE, offset=offset, sort_by=sort_by,
     )
     # If page is empty after delete, go back one page
     if not items and offset > 0:
@@ -622,7 +655,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
     items = await queries.get_items_page_with_nums(
         db, user_id, context_type,
         context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
-        limit=PAGE_SIZE, offset=offset,
+        limit=PAGE_SIZE, offset=offset, sort_by=sort_by,
     )
     if not items:
         await callback.message.edit_text(
@@ -634,7 +667,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
         )
         return
 
-    await _show_list(callback, context_type, ctx_id, offset, db=db)
+    await _show_list(callback, context_type, ctx_id, offset, db=db, sort_by=sort_by)
 
 
 @router.callback_query(F.data.startswith("vx:"))
@@ -644,8 +677,11 @@ async def on_list_delete_cancel(callback: types.CallbackQuery, db=None):
     ctx_short = parts[1]
     ctx_id = parts[2]
     offset = int(parts[3])
+    # Extract sort_by from vl: button on current keyboard
+    ctx = _extract_list_context(callback)
+    sort_by = ctx[3] if ctx else "d"
     context_type = _CTX_REV.get(ctx_short, "recent")
-    await _show_list(callback, context_type, ctx_id, offset, db=db)
+    await _show_list(callback, context_type, ctx_id, offset, db=db, sort_by=sort_by)
 
 
 @router.callback_query(F.data == "noop")
@@ -655,7 +691,7 @@ async def on_noop(callback: types.CallbackQuery, db=None):
 
 # ── Single Item View ──────────────────────────────────────
 
-async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id: str | int, item_id: int, db=None):
+async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id: str | int, item_id: int, db=None, sort_by: str = "d"):
     """Show full single item view with navigation and actions."""
     if db is None:
         db = callback.bot.get("db")
@@ -679,6 +715,7 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     nav = await queries.get_adjacent_item_ids(
         db, user_id, item_id, context_type,
         context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
+        sort_by=sort_by,
     )
 
     position = nav["position"] if nav else None
@@ -732,7 +769,7 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     back_offset = max(0, ((position - 1) // PAGE_SIZE) * PAGE_SIZE) if position else 0
     buttons.append([InlineKeyboardButton(
         text="🔙 К списку",
-        callback_data=f"vl:{ctx_short}:{ctx_id}:{back_offset}",
+        callback_data=f"vl:{ctx_short}:{ctx_id}:{back_offset}:{sort_by}",
     )])
 
     await callback.message.edit_text(
@@ -783,28 +820,23 @@ async def on_action_pin(callback: types.CallbackQuery, db=None):
         await callback.answer("📌 Закреплено")
 
     # Refresh — find context from the message buttons
-    # Re-render the item view by parsing the callback data prefix from inline keyboard
+    ctx = _extract_list_context(callback)
+    if ctx:
+        ctx_short, ctx_id, _, sort_by = ctx
+        await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db, sort_by=sort_by)
+        return
+
+
+def _extract_list_context(callback: types.CallbackQuery) -> tuple[str, str, int, str] | None:
+    """Extract (ctx_short, ctx_id, offset, sort_by) from the vl: back button in current keyboard."""
     kb = callback.message.reply_markup
     if kb and kb.inline_keyboard:
         for row in kb.inline_keyboard:
             for btn in row:
                 if btn.callback_data and btn.callback_data.startswith("vl:"):
                     parts = btn.callback_data.split(":")
-                    ctx_short = parts[1]
-                    ctx_id = parts[2]
-                    await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db)
-                    return
-
-
-def _extract_list_context(callback: types.CallbackQuery) -> tuple[str, str, int] | None:
-    """Extract (ctx_short, ctx_id, offset) from the vl: back button in current keyboard."""
-    kb = callback.message.reply_markup
-    if kb and kb.inline_keyboard:
-        for row in kb.inline_keyboard:
-            for btn in row:
-                if btn.callback_data and btn.callback_data.startswith("vl:"):
-                    parts = btn.callback_data.split(":")
-                    return parts[1], parts[2], int(parts[3])
+                    sort_by = parts[4] if len(parts) > 4 else "d"
+                    return parts[1], parts[2], int(parts[3]), sort_by
     return None
 
 
@@ -820,10 +852,10 @@ async def on_action_delete(callback: types.CallbackQuery, db=None):
         ]
     ]
     if ctx:
-        ctx_short, ctx_id, offset = ctx
+        ctx_short, ctx_id, offset, sort_by = ctx
         buttons.append([InlineKeyboardButton(
             text="🔙 К списку",
-            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset}",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset}:{sort_by}",
         )])
 
     await callback.message.edit_text(
@@ -852,14 +884,14 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
     await callback.answer("🗑 Удалено")
 
     if ctx:
-        ctx_short, ctx_id, offset = ctx
+        ctx_short, ctx_id, offset, sort_by = ctx
         context_type = _CTX_REV.get(ctx_short, "recent")
 
         # Check if current page still has items
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
             context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
-            limit=PAGE_SIZE, offset=offset,
+            limit=PAGE_SIZE, offset=offset, sort_by=sort_by,
         )
         if not items and offset > 0:
             offset = max(0, offset - PAGE_SIZE)
@@ -867,7 +899,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
         items = await queries.get_items_page_with_nums(
             db, user_id, context_type,
             context_id=ctx_id if context_type in ("category", "tag", "collection", "source") else None,
-            limit=PAGE_SIZE, offset=offset,
+            limit=PAGE_SIZE, offset=offset, sort_by=sort_by,
         )
         if not items:
             await callback.message.edit_text(
@@ -879,7 +911,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
             )
             return
 
-        await _show_list(callback, context_type, ctx_id, offset, db=db)
+        await _show_list(callback, context_type, ctx_id, offset, db=db, sort_by=sort_by)
     else:
         await callback.message.edit_text(
             "🗑 Запись удалена.",
@@ -897,8 +929,8 @@ async def on_action_delete_cancel(callback: types.CallbackQuery, db=None):
 
     ctx = _extract_list_context(callback)
     if ctx:
-        ctx_short, ctx_id, _ = ctx
-        await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db)
+        ctx_short, ctx_id, _, sort_by = ctx
+        await _show_item_view(callback, ctx_short, ctx_id, item_id, db=db, sort_by=sort_by)
     else:
         await callback.message.edit_text(
             "↩️ Удаление отменено.",
@@ -1019,6 +1051,7 @@ async def on_action_related(callback: types.CallbackQuery, db=None):
     # Preserve original browsing context for navigation
     ctx = _extract_list_context(callback)
     ctx_short, ctx_id = (ctx[0], ctx[1]) if ctx else ("r", "0")
+    # sort_by from ctx[3] if available, for back navigation
 
     lines = ["🔗 <b>Похожие записи:</b>\n"]
     buttons = []

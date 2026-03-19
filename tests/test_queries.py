@@ -1402,3 +1402,44 @@ def test_escape_fts5_special_chars():
     # FTS5 special chars like * and - should be wrapped safely in quotes
     result = queries._escape_fts5(["C++", "node.js"])
     assert result == '"C++" "node.js"'
+
+
+# ── Sort feature ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_sort_pinned_order(db):
+    """sort_by='p' should return pinned items first."""
+    cat = await queries.get_or_create_category(db, USER_ID, "SortTest", "📁")
+    id1 = await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="first", tags=[])
+    id2 = await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="second", tags=[])
+    id3 = await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="third", tags=[])
+    await queries.pin_item(db, USER_ID, id2)
+
+    items = await queries.get_items_page_with_nums(db, USER_ID, "category", context_id=cat["id"], sort_by="p")
+    assert items[0]["id"] == id2  # pinned item first
+
+
+@pytest.mark.asyncio
+async def test_sort_alphabetical(db):
+    """sort_by='a' should return items in alphabetical order by ai_summary."""
+    cat = await queries.get_or_create_category(db, USER_ID, "AlphaTest", "📁")
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="Zebra topic", tags=[], ai_summary="Zebra")
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="Apple topic", tags=[], ai_summary="Apple")
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="Mango topic", tags=[], ai_summary="Mango")
+
+    items = await queries.get_items_page_with_nums(db, USER_ID, "category", context_id=cat["id"], sort_by="a")
+    summaries = [it["ai_summary"] for it in items]
+    assert summaries == ["Apple", "Mango", "Zebra"]
+
+
+@pytest.mark.asyncio
+async def test_sort_by_source(db):
+    """sort_by='s' should return items with source first, NULLs last."""
+    cat = await queries.get_or_create_category(db, USER_ID, "SourceTest", "📁")
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="text", content_text="no source", tags=[])
+    await queries.save_item(db, USER_ID, category_id=cat["id"], content_type="forward", content_text="from channel", tags=[], source="TechChannel")
+
+    items = await queries.get_items_page_with_nums(db, USER_ID, "category", context_id=cat["id"], sort_by="s")
+    assert items[0]["source"] == "TechChannel"
+    assert items[1]["source"] is None

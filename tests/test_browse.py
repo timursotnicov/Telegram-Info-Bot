@@ -109,7 +109,7 @@ class TestExtractListContext:
         kb.inline_keyboard = [[btn]]
         cb = make_callback(USER_ID, "va:del:42", reply_markup=kb)
         result = _extract_list_context(cb)
-        assert result == ("c", "5", 10)
+        assert result == ("c", "5", 10, "d")
 
     def test_returns_none_without_vl_button(self):
         btn = MagicMock()
@@ -337,6 +337,32 @@ class TestCategoriesMarkup:
 
 
 # ── cmd_ask ───────────────────────────────────────────────
+
+class TestSortButtons:
+    def test_sort_buttons_renders_4(self):
+        """_sort_buttons should return 4 buttons."""
+        from savebot.handlers.browse import _sort_buttons
+        row = _sort_buttons(cat_id=5)
+        assert len(row) == 4
+
+    def test_sort_buttons_highlight(self):
+        """Active sort should have ✅ prefix."""
+        from savebot.handlers.browse import _sort_buttons
+        row = _sort_buttons(cat_id=5, active_sort="p")
+        texts = [btn.text for btn in row]
+        # "p" button should have ✅
+        assert any("✅" in t and "Закреп" in t for t in texts)
+        # "d" button should NOT have ✅
+        assert any("✅" not in t and "Новые" in t for t in texts)
+
+    def test_sort_default_is_date(self):
+        """browse_cat callback without sort segment should default to 'd'."""
+        # Parse like on_browse_category does
+        callback_data = "browse_cat:5:0"
+        parts = callback_data.split(":")
+        sort_by = parts[3] if len(parts) > 3 else "d"
+        assert sort_by == "d"
+
 
 class TestCmdAsk:
     @pytest.mark.asyncio

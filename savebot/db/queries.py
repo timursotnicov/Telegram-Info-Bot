@@ -70,6 +70,15 @@ DEFAULT_CATEGORIES = [
 ]
 
 
+# ── Sort Options ──────────────────────────────────────────
+SORT_OPTIONS = {
+    "d": "i.created_at DESC",
+    "p": "i.is_pinned DESC, i.created_at DESC",
+    "a": "COALESCE(i.ai_summary, i.content_text) ASC",
+    "s": "CASE WHEN i.source IS NULL THEN 1 ELSE 0 END, i.source ASC, i.created_at DESC",
+}
+
+
 async def ensure_default_categories(db: aiosqlite.Connection, user_id: int) -> None:
     """Create 7 default categories if user has none. Safe to call on every save."""
     try:
@@ -794,10 +803,11 @@ async def count_collection_items(db: aiosqlite.Connection, user_id: int, collect
 
 # ── Navigation ─────────────────────────────────────────────
 
-def _context_sql(context_type: str, context_id: str | int | None) -> tuple[str, list, str]:
+def _context_sql(context_type: str, context_id: str | int | None, sort_by: str = "d") -> tuple[str, list, str]:
     """Return (WHERE clause, params, ORDER BY) for a given context type."""
     if context_type == "category":
-        return "i.category_id = ? AND i.user_id = ?", [context_id], "i.created_at DESC"
+        order = SORT_OPTIONS.get(sort_by, SORT_OPTIONS["d"])
+        return "i.category_id = ? AND i.user_id = ?", [context_id], order
     elif context_type == "tag":
         return (
             "i.id IN (SELECT item_id FROM item_tags WHERE tag = ?) AND i.user_id = ?",
@@ -832,9 +842,10 @@ async def get_adjacent_item_ids(
     item_id: int,
     context_type: str,
     context_id: str | int | None = None,
+    sort_by: str = "d",
 ) -> dict | None:
     """Return {prev_id, next_id, position, total} for an item within a browsing context."""
-    where, extra_params, order = _context_sql(context_type, context_id)
+    where, extra_params, order = _context_sql(context_type, context_id, sort_by=sort_by)
     params = extra_params + [user_id]
 
     cursor = await db.execute(
@@ -863,9 +874,10 @@ async def get_items_page_with_nums(
     context_id: str | int | None = None,
     limit: int = 5,
     offset: int = 0,
+    sort_by: str = "d",
 ) -> list[dict]:
     """Return items with display_num for clickable list view, including category info."""
-    where, extra_params, order = _context_sql(context_type, context_id)
+    where, extra_params, order = _context_sql(context_type, context_id, sort_by=sort_by)
     params = extra_params + [user_id, limit, offset]
 
     cursor = await db.execute(
