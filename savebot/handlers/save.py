@@ -336,9 +336,8 @@ async def on_autosave_pick(callback: types.CallbackQuery, db=None):
     cat = next((c for c in cats if c["id"] == cat_id), {"name": "Unknown", "emoji": "📁"})
 
     await callback.message.edit_text(
-        f"✅ Перемещено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>",
+        f"✅ Сохранено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>",
         parse_mode="HTML",
-        reply_markup=_post_save_keyboard(cats, item_id, cat_id),
     )
     await callback.answer()
 
