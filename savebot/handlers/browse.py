@@ -12,7 +12,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from savebot.db import queries
 from savebot.db.state_store import set_state
-from savebot.services.ai_search import parse_search_query, synthesize_answer
+from savebot.services.ai_search import parse_search_query
 from savebot.services.connections import find_related_items
 
 router = Router()
@@ -185,10 +185,8 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
 
 def _more_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📨 Каналы", callback_data="bm:sources")],
         [InlineKeyboardButton(text="📁 Коллекции", callback_data="bm:colls")],
         [InlineKeyboardButton(text="🗺 Карта знаний", callback_data="bm:map")],
-        [InlineKeyboardButton(text="🕸 Забытые записи", callback_data="bm:forg")],
         [InlineKeyboardButton(text="➕ Новая категория", callback_data="bm:newcat")],
         [InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")],
     ])
@@ -204,7 +202,6 @@ def _categories_markup(categories: list[dict]) -> InlineKeyboardMarkup:
             callback_data=f"browse_cat:{cat['id']}:0",
         )])
     buttons.append([
-        InlineKeyboardButton(text="🏷 Теги", callback_data="bm:tags"),
         InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub"),
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -1209,63 +1206,7 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
 
 @router.message(Command("ask"))
 async def cmd_ask(message: types.Message, db=None):
-    user_id = message.from_user.id
-    question = message.text.replace("/ask", "", 1).strip()
-    if not question:
-        await message.reply(
-            "Использование: /ask &lt;вопрос&gt;\n\n"
-            "Примеры:\n"
-            "• /ask какие идеи я сохранял про маркетинг?\n"
-            "• /ask что я знаю про продуктивность?\n"
-            "• /ask резюмируй мои записи про финансы",
-        )
-        return
-
-    wait_msg = await message.reply("🤔 Думаю...")
-
-    # Find relevant items
-    parsed = await parse_search_query(question)
-    items = None
-
-    if parsed and parsed.get("keywords"):
-        items = await queries.search_items_filtered(
-            db, user_id, keywords=parsed["keywords"], limit=15,
-        )
-
-    # Fallback: use first 3 words as FTS5 query
-    if not items:
-        fallback_query = " ".join(question.split()[:3])
-        items = await queries.search_items(db, user_id, fallback_query, limit=15)
-
-    if not items:
-        await wait_msg.edit_text("🤔 Не нашёл подходящих записей в твоей базе знаний.")
-        return
-
-    # Synthesize answer
-    answer = await synthesize_answer(question, items)
-
-    if answer:
-        text = f"💡 <b>Ответ:</b>\n{html.escape(answer)}\n\n"
-        text += f"📚 <b>Источники ({len(items)}):</b>\n"
-        for item in items[:5]:
-            summary = html.escape(item.get("ai_summary") or item["content_text"][:60])
-            text += f"  #{item['id']} {summary}\n"
-    else:
-        # AI failed — show search results instead
-        text = "🔍 Не удалось сформировать ответ, но вот подходящие записи:\n\n"
-        text += "\n\n".join(_format_item(item) for item in items[:10])
-
-    buttons = []
-    shown_items = items[:10]
-    for i, item in enumerate(shown_items, 1):
-        title = _format_item_short(item)
-        buttons.append([InlineKeyboardButton(
-            text=f"{i}. {title}",
-            callback_data=f"vi:r:0:{item['id']}",
-        )])
-    if len(items) > 10:
-        text += f"\n<i>(и ещё {len(items) - 10} записей)</i>"
-    await wait_msg.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
+    await message.reply("⚠️ Команда /ask временно отключена. Используйте /search для поиска.")
 
 
 # ── /recent (clickable) ──────────────────────────────────

@@ -1244,6 +1244,81 @@ async def test_get_forgotten_items_user_isolation(db):
 # ── _escape_fts5 ────────────────────────────────────────────
 
 
+# ── ensure_default_categories ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ensure_default_categories_creates_7(db):
+    await queries.ensure_default_categories(db, USER_ID)
+    cats = await queries.get_all_categories(db, USER_ID)
+    assert len(cats) == 7
+
+
+@pytest.mark.asyncio
+async def test_ensure_default_categories_skips_existing(db):
+    # User already has a category
+    await queries.get_or_create_category(db, USER_ID, "Custom", "🎯")
+    await queries.ensure_default_categories(db, USER_ID)
+    cats = await queries.get_all_categories(db, USER_ID)
+    # Should still be just the one custom category — no defaults added
+    assert len(cats) == 1
+    assert cats[0]["name"] == "Custom"
+
+
+def test_default_categories_constant_has_7():
+    assert len(queries.DEFAULT_CATEGORIES) == 7
+
+
+# ── get_category_by_name ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_get_category_by_name_found(db):
+    await queries.get_or_create_category(db, USER_ID, "Work", "💼")
+    cat = await queries.get_category_by_name(db, USER_ID, "Work")
+    assert cat is not None
+    assert cat["name"] == "Work"
+
+
+@pytest.mark.asyncio
+async def test_get_category_by_name_not_found(db):
+    cat = await queries.get_category_by_name(db, USER_ID, "NonExistent")
+    assert cat is None
+
+
+# ── find_duplicate by forward_url / tg_message_id ─────────
+
+
+@pytest.mark.asyncio
+async def test_find_duplicate_by_forward_url(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "📁")
+    await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="forward", content_text="Forwarded post",
+        tags=[], forward_url="https://t.me/channel/123",
+    )
+    dup = await queries.find_duplicate(
+        db, USER_ID, "different text", forward_url="https://t.me/channel/123",
+    )
+    assert dup is not None
+    assert dup["forward_url"] == "https://t.me/channel/123"
+
+
+@pytest.mark.asyncio
+async def test_find_duplicate_by_tg_message_id(db):
+    cat = await queries.get_or_create_category(db, USER_ID, "Test", "📁")
+    await queries.save_item(
+        db, USER_ID, category_id=cat["id"],
+        content_type="text", content_text="Some message",
+        tags=[], tg_message_id=55555,
+    )
+    dup = await queries.find_duplicate(
+        db, USER_ID, "different text", tg_message_id=55555,
+    )
+    assert dup is not None
+    assert dup["tg_message_id"] == 55555
+
+
 def test_escape_fts5_basic():
     result = queries._escape_fts5(["hello", "world"])
     assert result == '"hello" "world"'

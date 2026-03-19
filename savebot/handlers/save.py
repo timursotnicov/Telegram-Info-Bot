@@ -17,12 +17,37 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def _post_save_keyboard(item_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔄 Изменить", callback_data=f"autosave_change:{item_id}"),
-        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"autosave_delete:{item_id}"),
+def _category_buttons(
+    categories: list[dict],
+    item_id: int,
+    highlight_id: int | None = None,
+    callback_prefix: str = "autosave_pick",
+) -> list[list[InlineKeyboardButton]]:
+    """Build category selection buttons in a grid (3 per row)."""
+    buttons = []
+    row = []
+    for cat in categories:
+        emoji = cat.get("emoji", "📁")
+        mark = "✅ " if cat["id"] == highlight_id else ""
+        row.append(InlineKeyboardButton(
+            text=f"{mark}{emoji} {cat['name']}",
+            callback_data=f"{callback_prefix}:{item_id}:{cat['id']}",
+        ))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    return buttons
+
+
+def _post_save_keyboard(categories: list[dict], item_id: int, saved_cat_id: int) -> InlineKeyboardMarkup:
+    buttons = _category_buttons(categories, item_id, highlight_id=saved_cat_id)
+    buttons.append([
         InlineKeyboardButton(text="📌 Pin", callback_data=f"autosave_pin:{item_id}"),
-    ]])
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"autosave_delete:{item_id}"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def _confirm_keyboard(pending_key: str) -> InlineKeyboardMarkup:
@@ -129,31 +154,38 @@ async def _quick_capture(message: types.Message, db) -> bool:
         return False
 
     user_id = message.from_user.id
-    inbox = await queries.get_or_create_inbox_category(db, user_id)
+    raznoye = await queries.get_category_by_name(db, user_id, "Разное")
+    if not raznoye:
+        raznoye = await queries.get_or_create_category(db, user_id, "Разное", "📥")
     await queries.save_item(
         db, user_id,
-        category_id=inbox["id"],
+        category_id=raznoye["id"],
         content_type="text",
         content_text=text,
         tags=[],
         ai_summary=text[:100],
     )
-    await message.reply("✅ Сохранено в 📥 Inbox")
+    await message.reply("✅ Сохранено в 📥 Разное")
     return True
 
 
 async def _process_content(message: types.Message, db):
     """Process incoming content — auto-save or manual mode."""
     user_id = message.from_user.id
+    await queries.ensure_default_categories(db, user_id)
 
-    # Quick capture: '!' prefix saves to Inbox without AI
+    # Quick capture: '!' prefix saves to Разное without AI
     if await _quick_capture(message, db):
         return
 
     content_type, content_text, url, file_id, source, forward_url = await _detect_content(message)
 
     # Check for duplicates
-    dup = await queries.find_duplicate(db, user_id, content_text, url)
+    dup = await queries.find_duplicate(
+        db, user_id, content_text, url,
+        forward_url=forward_url,
+        tg_message_id=message.message_id,
+    )
     if dup:
         await message.reply(
             f"⚠️ Похоже, это уже сохранено (ID: {dup['id']}).\n"
@@ -170,14 +202,18 @@ async def _process_content(message: types.Message, db):
     # Classify with AI
     ai_result = await classify_content(content_text, categories, tag_names)
     if not ai_result:
-        ai_result = {"category": "Несортированное", "emoji": "📥", "tags": [], "summary": ""}
+        ai_result = {"category": "Разное", "emoji": "📥", "tags": [], "summary": ""}
 
     # Check user preferences
     prefs = await queries.get_user_preferences(db, user_id)
 
     if prefs.get("auto_save", 1):
         # AUTO-SAVE: save immediately
-        cat = await queries.get_or_create_category(db, user_id, ai_result["category"], ai_result.get("emoji", "📁"))
+        cat = await queries.get_category_by_name(db, user_id, ai_result["category"])
+        if not cat:
+            cat = await queries.get_category_by_name(db, user_id, "Разное")
+        if not cat:
+            cat = await queries.get_or_create_category(db, user_id, "Разное", "📥")
         item_id = await queries.save_item(
             db, user_id,
             category_id=cat["id"],
@@ -213,7 +249,7 @@ async def _process_content(message: types.Message, db):
         except Exception:
             logger.exception("find_related_items failed for item %d", item_id)
 
-        await message.reply(text, reply_markup=_post_save_keyboard(item_id), parse_mode="HTML")
+        await message.reply(text, reply_markup=_post_save_keyboard(categories, item_id, cat["id"]), parse_mode="HTML")
 
     else:
         # MANUAL SAVE: show confirmation (old flow)
@@ -280,18 +316,7 @@ async def on_autosave_change(callback: types.CallbackQuery, db=None):
     user_id = callback.from_user.id
     categories = await queries.get_all_categories(db, user_id)
 
-    buttons = []
-    row = []
-    for cat in categories:
-        row.append(InlineKeyboardButton(
-            text=f"{cat.get('emoji', '📁')} {cat['name']}",
-            callback_data=f"autosave_pick:{item_id}:{cat['id']}",
-        ))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
+    buttons = _category_buttons(categories, item_id)
 
     await callback.message.edit_reply_markup(
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -313,7 +338,7 @@ async def on_autosave_pick(callback: types.CallbackQuery, db=None):
     await callback.message.edit_text(
         f"✅ Перемещено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>",
         parse_mode="HTML",
-        reply_markup=_post_save_keyboard(item_id),
+        reply_markup=_post_save_keyboard(cats, item_id, cat_id),
     )
     await callback.answer()
 
@@ -348,7 +373,11 @@ async def on_save_confirm(callback: types.CallbackQuery, db=None):
 
     user_id = callback.from_user.id
     ai = data["ai_result"]
-    cat = await queries.get_or_create_category(db, user_id, ai["category"], ai.get("emoji", "📁"))
+    cat = await queries.get_category_by_name(db, user_id, ai["category"])
+    if not cat:
+        cat = await queries.get_category_by_name(db, user_id, "Разное")
+    if not cat:
+        cat = await queries.get_or_create_category(db, user_id, "Разное", "📥")
 
     item_id = await queries.save_item(
         db, user_id,

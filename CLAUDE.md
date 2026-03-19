@@ -26,6 +26,10 @@ Python 3.12 + aiogram 3.26 + aiosqlite + OpenRouter API
 | Anti-patterns | @.conventions/anti-patterns/callback-data.md |
 | Deploy script | @deploy/setup.sh |
 | Structural tests | @tests/test_architecture.py |
+| Data model (all tables+fields) | @docs/data-dictionary.md |
+| All query functions (index) | @savebot/db/queries.py (top docstring) |
+| AI classification prompt | @savebot/services/ai_classifier.py |
+| AI search prompt | @savebot/services/ai_search.py |
 
 ## Enforced Rules (tested mechanically)
 - Router order enforced by `tests/test_architecture.py::TestRouterOrder`

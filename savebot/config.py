@@ -35,3 +35,12 @@ config.ai_fallback_models = [
     "google/gemma-3-12b-it:free",
     "qwen/qwen3-next-80b-a3b-instruct:free",
 ]
+
+def _validate_config():
+    """Fail fast with clear error if required env vars are missing."""
+    if not config.bot_token:
+        raise ValueError("BOT_TOKEN environment variable is required. Set it in .env file.")
+    if not config.openrouter_api_key:
+        raise ValueError("OPENROUTER_API_KEY environment variable is required. Set it in .env file.")
+
+_validate_config()

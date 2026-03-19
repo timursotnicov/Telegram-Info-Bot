@@ -27,6 +27,7 @@ CALLBACK_PATTERNS = [
     "tag_items:12345678901234567890:99999",
     "settings_toggle:daily_brief_enabled",
     "settings_brief_time:23:59",
+    "autosave_pick:99999:99999",
 ]
 
 
@@ -37,6 +38,33 @@ class TestRouterOrder:
         source = BOT_PY.read_text(encoding="utf-8")
         matches = re.findall(r"dp\.include_router\((\w+)\.router\)", source)
         assert matches == EXPECTED_ROUTER_ORDER, ROUTER_ORDER_ERROR
+
+
+class TestBotSourceChecks:
+    """Verify source-level constraints on bot.py and handler files."""
+
+    def test_bot_commands_no_ask(self):
+        source = BOT_PY.read_text(encoding="utf-8")
+        # The commands list in set_bot_commands should not include "ask"
+        import ast
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.List):
+                for elt in node.elts:
+                    if isinstance(elt, ast.Call):
+                        for kw in elt.keywords:
+                            if kw.arg == "command":
+                                if isinstance(kw.value, ast.Constant):
+                                    assert kw.value.value != "ask", (
+                                        "/ask should not be in bot commands list"
+                                    )
+
+    def test_menu_no_forcereply(self):
+        menu_py = BOT_PY.parent / "handlers" / "menu.py"
+        source = menu_py.read_text(encoding="utf-8")
+        assert "ForceReply" not in source, (
+            "menu.py should not use ForceReply — use state_store pattern instead"
+        )
 
 
 class TestCallbackDataLimit:
