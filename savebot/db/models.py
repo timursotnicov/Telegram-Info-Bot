@@ -87,6 +87,12 @@ CREATE TABLE IF NOT EXISTS digest_log (
 async def init_db(db_path: str) -> aiosqlite.Connection:
     db = await aiosqlite.connect(db_path)
     db.row_factory = aiosqlite.Row
+    # Performance & reliability PRAGMAs
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")
+    await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute("PRAGMA cache_size=-8000")
+    await db.execute("PRAGMA foreign_keys=ON")
     await db.executescript(SCHEMA)
     await db.commit()
     await run_migrations(db)

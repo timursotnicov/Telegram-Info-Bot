@@ -636,16 +636,7 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     elif context_type == "source":
         total = await queries.count_items_by_source(db, user_id, str(ctx_id))
     else:
-        # Use a general approach — get_items_page_with_nums with high limit to count
-        # For simplicity, estimate from display_num of last item
-        if items:
-            # Re-query without limit for count
-            all_items = await queries.get_items_page_with_nums(
-                db, user_id, context_type, context_id=None, limit=10000, offset=0,
-            )
-            total = len(all_items)
-        else:
-            total = 0
+        total = await queries.count_items_in_context(db, user_id, context_type)
 
     title = _CTX_TITLES.get(context_type, "📋 Записи")
     if context_type == "category":

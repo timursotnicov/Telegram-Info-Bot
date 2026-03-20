@@ -50,10 +50,20 @@ _ALLOWED_PREF_KEYS = {"auto_save", "digest_enabled", "digest_day", "digest_time"
 # ── Helper ─────────────────────────────────────────────────
 
 async def _attach_tags(db: aiosqlite.Connection, items: list[dict]) -> list[dict]:
-    """Attach tags to a list of items (avoids N+1 DRY violation)."""
+    """Attach tags to a list of items in one batch query."""
+    if not items:
+        return items
+    ids = [item["id"] for item in items]
+    placeholders = ",".join("?" * len(ids))
+    cursor = await db.execute(
+        f"SELECT item_id, tag FROM item_tags WHERE item_id IN ({placeholders})", ids,
+    )
+    rows = await cursor.fetchall()
+    tag_map: dict[int, list[str]] = {}
+    for row in rows:
+        tag_map.setdefault(row["item_id"], []).append(row["tag"])
     for item in items:
-        c = await db.execute("SELECT tag FROM item_tags WHERE item_id = ?", (item["id"],))
-        item["tags"] = [r["tag"] for r in await c.fetchall()]
+        item["tags"] = tag_map.get(item["id"], [])
     return items
 
 
@@ -937,6 +947,21 @@ async def count_items_by_tag(db: aiosqlite.Connection, user_id: int, tag: str) -
            JOIN items i ON i.id = t.item_id
            WHERE t.tag = ? AND i.user_id = ?""",
         (tag, user_id),
+    )
+    return (await cursor.fetchone())["c"]
+
+
+async def count_items_in_context(
+    db: aiosqlite.Connection,
+    user_id: int,
+    context_type: str,
+    context_id: str | int | None = None,
+) -> int:
+    """Count items in a browsing context without loading them."""
+    where, extra_params, _order = _context_sql(context_type, context_id)
+    params = extra_params + [user_id]
+    cursor = await db.execute(
+        f"SELECT COUNT(*) AS c FROM items i WHERE {where}", params,
     )
     return (await cursor.fetchone())["c"]
 
