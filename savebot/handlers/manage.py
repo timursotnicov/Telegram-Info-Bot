@@ -24,9 +24,8 @@ logger = logging.getLogger(__name__)
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="📂 Browse"), KeyboardButton(text="🔍 Search")],
-        [KeyboardButton(text="📌 Pinned"), KeyboardButton(text="🕐 Recent")],
-        [KeyboardButton(text="⚙️ Settings")],
+        [KeyboardButton(text="🕐 Недавние"), KeyboardButton(text="🔍 Поиск")],
+        [KeyboardButton(text="📂 Категории"), KeyboardButton(text="📌 Закрепленные")],
     ],
     resize_keyboard=True,
     is_persistent=True,
@@ -54,10 +53,11 @@ async def cmd_start(message: types.Message, **kwargs):
         "Просто отправь мне текст, ссылку, фото или файл — "
         "я сохраню и организую автоматически.\n\n"
         "Используй кнопки внизу для быстрого доступа:\n"
-        "📂 Browse — просмотр по категориям\n"
-        "🔍 Search — поиск по записям\n"
-        "📌 Pinned / 🕐 Recent — закреплённые и последние\n"
-        "⚙️ Settings — настройки\n\n"
+        "🕐 Недавние — все записи по порядку\n"
+        "🔍 Поиск — найти нужное\n"
+        "📂 Категории — просмотр по категориям\n"
+        "📌 Закрепленные — важные записи\n\n"
+        "⚙️ Настройки: /settings\n"
         "ℹ️ Подробнее: /help",
         reply_markup=MAIN_KEYBOARD,
         parse_mode="HTML",
@@ -72,8 +72,8 @@ async def cmd_help(message: types.Message, **kwargs):
         "Основные команды:\n"
         "/browse — просмотр по категориям\n"
         "/search &lt;запрос&gt; — поиск по записям\n"
-        "/ask &lt;вопрос&gt; — спросить базу знаний (AI)\n"
         "/recent — последние записи\n"
+        "/settings — настройки бота\n"
         "/help — эта справка\n\n"
         "Остальные действия доступны через кнопки "
         "в нижней панели клавиатуры.",

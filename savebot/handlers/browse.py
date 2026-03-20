@@ -57,6 +57,20 @@ def _sort_buttons(cat_id: int, active_sort: str = "d") -> list[InlineKeyboardBut
     return row
 
 
+def _recent_sort_buttons(active_sort: str = "d") -> list[InlineKeyboardButton]:
+    """Build date direction toggle for Recent view."""
+    return [
+        InlineKeyboardButton(
+            text=("✅ " if active_sort == "d" else "") + "🕐 Новые",
+            callback_data="vl:r:0:0:d",
+        ),
+        InlineKeyboardButton(
+            text=("✅ " if active_sort == "o" else "") + "📅 Старые",
+            callback_data="vl:r:0:0:o",
+        ),
+    ]
+
+
 # ── Helpers ────────────────────────────────────────────────
 
 def _truncate_tag(tag: str, max_len: int = 20) -> str:
@@ -190,10 +204,10 @@ def _clickable_list_buttons(
     return buttons
 
 
-def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
+def _back_button_for_ctx(ctx_short: str, ctx_id: str | int = "0") -> InlineKeyboardButton:
     """Return the appropriate back button for a given context."""
     if ctx_short == "c":
-        return InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")
+        return InlineKeyboardButton(text="🔙 К категории", callback_data=f"cm:{ctx_id}")
     elif ctx_short == "t":
         return InlineKeyboardButton(text="🔙 К тегам", callback_data="tags_back")
     elif ctx_short == "o":
@@ -208,6 +222,7 @@ def _back_button_for_ctx(ctx_short: str) -> InlineKeyboardButton:
 
 def _more_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏷 Теги", callback_data="bm:tags")],
         [InlineKeyboardButton(text="📁 Коллекции", callback_data="bm:colls")],
         [InlineKeyboardButton(text="🗺 Карта знаний", callback_data="bm:map")],
         [InlineKeyboardButton(text="➕ Новая категория", callback_data="bm:newcat")],
@@ -222,9 +237,10 @@ def _categories_markup(categories: list[dict]) -> InlineKeyboardMarkup:
         emoji = cat.get("emoji", "📁")
         buttons.append([InlineKeyboardButton(
             text=f"{emoji} {cat['name']} ({cat['item_count']})",
-            callback_data=f"browse_cat:{cat['id']}:0",
+            callback_data=f"cm:{cat['id']}",
         )])
     buttons.append([
+        InlineKeyboardButton(text="📨 Все каналы", callback_data="bm:sources"),
         InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub"),
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -238,10 +254,7 @@ async def _show_categories_msg(message: types.Message, db=None):
         await message.reply(
             "📂 <b>Категорий пока нет.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="🏷 Теги", callback_data="bm:tags"),
-                    InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub"),
-                ]
+                [InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub")]
             ]),
             parse_mode="HTML",
         )
@@ -278,10 +291,7 @@ async def on_hub_cats(callback: types.CallbackQuery, db=None):
         await callback.message.edit_text(
             "📂 <b>Категорий пока нет.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="🏷 Теги", callback_data="bm:tags"),
-                    InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub"),
-                ]
+                [InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub")]
             ]),
             parse_mode="HTML",
         )
@@ -291,6 +301,90 @@ async def on_hub_cats(callback: types.CallbackQuery, db=None):
     await callback.message.edit_text(
         "📂 <b>Категории:</b>",
         reply_markup=_categories_markup(categories),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+# ── Category Sub-Menu ─────────────────────────────────────
+
+@router.callback_query(F.data.startswith("cm:"))
+async def on_category_menu(callback: types.CallbackQuery, db=None):
+    """Show category sub-menu: List, Channels, Latest item."""
+    cat_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+
+    cats = await queries.get_all_categories(db, user_id)
+    cat = next((c for c in cats if c["id"] == cat_id), None)
+    if not cat:
+        await callback.answer("Категория не найдена.")
+        return
+
+    emoji = cat.get("emoji", "📁")
+    count = cat.get("item_count", 0)
+
+    buttons = [
+        [InlineKeyboardButton(text="📋 Список", callback_data=f"browse_cat:{cat_id}:0")],
+        [InlineKeyboardButton(text="📨 Каналы", callback_data=f"cs:{cat_id}:0")],
+        [InlineKeyboardButton(text="🆕 Последняя запись", callback_data=f"cl:{cat_id}")],
+        [InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")],
+    ]
+
+    await callback.message.edit_text(
+        f"{emoji} <b>{cat['name']}</b> ({count})",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("cl:"))
+async def on_category_latest(callback: types.CallbackQuery, db=None):
+    """Jump to the latest item in a category."""
+    cat_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+
+    items = await queries.get_items_page_with_nums(
+        db, user_id, "category", context_id=cat_id, limit=1, offset=0,
+    )
+    if not items:
+        await callback.answer("В этой категории нет записей.")
+        return
+
+    await _show_item_view(callback, "c", str(cat_id), items[0]["id"], db=db)
+
+
+# ── Category Sources ──────────────────────────────────────
+
+@router.callback_query(F.data.startswith("cs:"))
+async def on_category_sources(callback: types.CallbackQuery, db=None):
+    """Show sources/channels within a specific category."""
+    parts = callback.data.split(":")
+    cat_id = int(parts[1])
+    user_id = callback.from_user.id
+
+    sources = await queries.get_sources_by_category(db, user_id, cat_id)
+    if not sources:
+        await callback.answer("В этой категории нет пересланных записей из каналов.")
+        return
+
+    buttons = []
+    for src in sources:
+        name = src["source"]
+        trunc = _truncate_source(name)
+        buttons.append([InlineKeyboardButton(
+            text=f"📨 {name} ({src['count']})",
+            callback_data=f"src:{trunc}:0",
+        )])
+    buttons.append([InlineKeyboardButton(text="🔙 К категории", callback_data=f"cm:{cat_id}")])
+
+    cats = await queries.get_all_categories(db, user_id)
+    cat = next((c for c in cats if c["id"] == cat_id), None)
+    cat_name = cat["name"] if cat else ""
+
+    await callback.message.edit_text(
+        f"📨 <b>Каналы в «{html.escape(cat_name)}»:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -383,15 +477,36 @@ def _truncate_source(source: str, max_len: int = 40) -> str:
     return source[:max_len]
 
 
-@router.callback_query(F.data == "bm:sources")
+@router.callback_query(F.data.startswith("bm:sources"))
 async def on_hub_sources(callback: types.CallbackQuery, db=None):
     user_id = callback.from_user.id
-    sources = await queries.get_all_sources(db, user_id)
+
+    # Parse sort mode: bm:sources, bm:sources:c, bm:sources:d
+    parts = callback.data.split(":")
+    sort_mode = parts[2] if len(parts) > 2 else "c"
+
+    if sort_mode == "d":
+        sources = await queries.get_all_sources_by_date(db, user_id, ascending=False)
+    else:
+        sources = await queries.get_all_sources(db, user_id)
+
     if not sources:
         await callback.answer("Нет пересланных записей из каналов.")
         return
 
-    buttons = []
+    # Sort toggle buttons
+    sort_buttons = [
+        InlineKeyboardButton(
+            text=("✅ " if sort_mode == "c" else "") + "📊 По кол-ву",
+            callback_data="bm:sources:c",
+        ),
+        InlineKeyboardButton(
+            text=("✅ " if sort_mode == "d" else "") + "🕐 По дате",
+            callback_data="bm:sources:d",
+        ),
+    ]
+
+    buttons = [sort_buttons]
     for src in sources:
         name = src["source"]
         trunc = _truncate_source(name)
@@ -402,7 +517,7 @@ async def on_hub_sources(callback: types.CallbackQuery, db=None):
     buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
 
     await callback.message.edit_text(
-        "📨 <b>Каналы:</b>",
+        "📨 <b>Все каналы:</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
@@ -554,7 +669,9 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
     buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id, sort_by=sort_by)
     if context_type == "category":
         buttons.insert(0, _sort_buttons(int(ctx_id), sort_by))
-    buttons.append([_back_button_for_ctx(ctx_short)])
+    elif context_type == "recent":
+        buttons.insert(0, _recent_sort_buttons(sort_by))
+    buttons.append([_back_button_for_ctx(ctx_short, ctx_id)])
 
     await callback.message.edit_text(
         title,
@@ -661,7 +778,7 @@ async def on_list_delete_confirm(callback: types.CallbackQuery, db=None):
         await callback.message.edit_text(
             "📋 <b>Список пуст.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [_back_button_for_ctx(ctx_short)]
+                [_back_button_for_ctx(ctx_short, ctx_id)]
             ]),
             parse_mode="HTML",
         )
@@ -905,7 +1022,7 @@ async def on_action_delete_confirm(callback: types.CallbackQuery, db=None):
             await callback.message.edit_text(
                 "📋 <b>Список пуст.</b>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [_back_button_for_ctx(ctx_short)]
+                    [_back_button_for_ctx(ctx_short, ctx_id)]
                 ]),
                 parse_mode="HTML",
             )

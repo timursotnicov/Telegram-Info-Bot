@@ -29,6 +29,10 @@ CALLBACK_PATTERNS = [
     "settings_toggle:daily_brief_enabled",
     "settings_brief_time:23:59",
     "autosave_pick:99999:99999",
+    "cm:99999",
+    "cs:99999:99999",
+    "cl:99999",
+    "bm:sources:d",
 ]
 
 

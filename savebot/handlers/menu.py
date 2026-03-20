@@ -17,7 +17,11 @@ from savebot.db.state_store import get_state, set_state, delete_state
 router = Router()
 logger = logging.getLogger(__name__)
 
-BUTTON_TEXTS = {"📂 Browse", "🔍 Search", "📌 Pinned", "🕐 Recent", "⚙️ Settings"}
+BUTTON_TEXTS = {
+    "🕐 Недавние", "🔍 Поиск", "📂 Категории", "📌 Закрепленные",
+    # Backward compat: old English buttons cached on some clients
+    "📂 Browse", "🔍 Search", "📌 Pinned", "🕐 Recent", "⚙️ Settings",
+}
 
 
 # ── State dispatcher ──────────────────────────────────────
@@ -155,20 +159,20 @@ async def handle_keyboard_button(message: types.Message, db=None):
 
     text = message.text
 
-    if text == "📂 Browse":
+    if text in ("📂 Категории", "📂 Browse"):
         from savebot.handlers.browse import cmd_browse
         await cmd_browse(message, db=db)
 
-    elif text == "🔍 Search":
+    elif text in ("🔍 Поиск", "🔍 Search"):
         user_id = message.from_user.id
         await set_state(db, f"search_prompt_{user_id}", user_id, "search_prompt", {})
         await message.reply("🔍 Введите поисковый запрос:")
 
-    elif text == "📌 Pinned":
+    elif text in ("📌 Закрепленные", "📌 Pinned"):
         from savebot.handlers.browse import cmd_pinned
         await cmd_pinned(message, db=db)
 
-    elif text == "🕐 Recent":
+    elif text in ("🕐 Недавние", "🕐 Recent"):
         from savebot.handlers.browse import cmd_recent
         await cmd_recent(message, db=db)
 

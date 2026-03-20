@@ -28,6 +28,7 @@ async def set_bot_commands(bot: Bot):
         BotCommand(command="browse", description="Навигация по записям"),
         BotCommand(command="search", description="Поиск"),
         BotCommand(command="recent", description="Последние записи"),
+        BotCommand(command="settings", description="Настройки"),
         BotCommand(command="help", description="Помощь"),
     ]
     await bot.set_my_commands(commands)

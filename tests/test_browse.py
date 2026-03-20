@@ -31,9 +31,9 @@ USER_ID = 1
 
 class TestBackButtonForCtx:
     def test_category_context(self):
-        btn = _back_button_for_ctx("c")
-        assert btn.callback_data == "bm:cats"
-        assert "категориям" in btn.text.lower()
+        btn = _back_button_for_ctx("c", 5)
+        assert btn.callback_data == "cm:5"
+        assert "категории" in btn.text.lower()
 
     def test_tag_context(self):
         btn = _back_button_for_ctx("t")

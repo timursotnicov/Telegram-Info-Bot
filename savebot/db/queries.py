@@ -76,6 +76,7 @@ SORT_OPTIONS = {
     "p": "i.is_pinned DESC, i.created_at DESC",
     "a": "COALESCE(i.ai_summary, i.content_text) ASC",
     "s": "CASE WHEN i.source IS NULL THEN 1 ELSE 0 END, i.source ASC, i.created_at DESC",
+    "o": "i.created_at ASC",
 }
 
 
@@ -610,6 +611,37 @@ async def count_items_by_source(db: aiosqlite.Connection, user_id: int, source: 
     return (await cursor.fetchone())["c"]
 
 
+async def get_sources_by_category(
+    db: aiosqlite.Connection, user_id: int, category_id: int
+) -> list[dict]:
+    """Get distinct sources with item counts for a specific category."""
+    cursor = await db.execute(
+        """SELECT source, COUNT(*) as count
+           FROM items
+           WHERE user_id = ? AND category_id = ? AND source IS NOT NULL AND source != ''
+           GROUP BY source
+           ORDER BY count DESC""",
+        (user_id, category_id),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_all_sources_by_date(
+    db: aiosqlite.Connection, user_id: int, ascending: bool = False
+) -> list[dict]:
+    """Get distinct sources sorted by date of most recent item."""
+    order = "ASC" if ascending else "DESC"
+    cursor = await db.execute(
+        f"""SELECT source, COUNT(*) as count, MAX(created_at) as last_saved
+            FROM items
+            WHERE user_id = ? AND source IS NOT NULL AND source != ''
+            GROUP BY source
+            ORDER BY last_saved {order}""",
+        (user_id,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
 # ── Knowledge Map ──────────────────────────────────────────
 
 async def get_category_tag_map(db: aiosqlite.Connection, user_id: int) -> list[dict]:
@@ -815,7 +847,8 @@ def _context_sql(context_type: str, context_id: str | int | None, sort_by: str =
             "i.created_at DESC",
         )
     elif context_type == "recent":
-        return "i.user_id = ?", [], "i.created_at DESC"
+        order = SORT_OPTIONS.get(sort_by, SORT_OPTIONS["d"])
+        return "i.user_id = ?", [], order
     elif context_type == "pinned":
         return "i.is_pinned = 1 AND i.user_id = ?", [], "i.created_at DESC"
     elif context_type == "forgotten":
