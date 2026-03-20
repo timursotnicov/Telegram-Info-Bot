@@ -169,6 +169,91 @@ async def _quick_capture(message: types.Message, db) -> bool:
     return True
 
 
+async def _classify_with_ai(db, user_id: int, content_text: str) -> dict:
+    """Classify content with AI, fallback to Разное."""
+    categories = await queries.get_all_categories(db, user_id)
+    tags = await queries.get_all_tags(db, user_id)
+    tag_names = [t["tag"] for t in tags]
+    ai_result = await classify_content(content_text, categories, tag_names)
+    if not ai_result:
+        ai_result = {"category": "Разное", "emoji": "📥", "tags": [], "summary": ""}
+    return ai_result
+
+
+async def _auto_save_flow(message, db, user_id, ai_result,
+                          content_type, content_text, url, file_id, source, forward_url):
+    """AUTO-SAVE: save immediately and show post-save keyboard."""
+    cat = await queries.get_category_by_name(db, user_id, ai_result["category"])
+    if not cat:
+        cat = await queries.get_category_by_name(db, user_id, "Разное")
+    if not cat:
+        cat = await queries.get_or_create_category(db, user_id, "Разное", "📥")
+    item_id = await queries.save_item(
+        db, user_id,
+        category_id=cat["id"],
+        content_type=content_type,
+        content_text=content_text,
+        tags=ai_result["tags"],
+        url=url, file_id=file_id, source=source,
+        ai_summary=ai_result.get("summary"),
+        tg_message_id=message.message_id,
+        forward_url=forward_url,
+    )
+
+    tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
+    text = f"✅ Сохранено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>"
+    if tags_str:
+        text += f" / {tags_str}"
+    if ai_result.get("summary"):
+        text += f"\n<i>{html.escape(ai_result['summary'])}</i>"
+
+    # Find related items
+    try:
+        related = await find_related_items(
+            db, item_id, user_id,
+            category_id=cat["id"],
+            tags=ai_result["tags"],
+            source=source,
+        )
+        if related:
+            text += "\n\n🔗 <b>Похожие записи:</b>"
+            for r in related:
+                r_summary = r.get("ai_summary") or r["content_text"][:60]
+                text += f"\n  #{r['id']} {html.escape(r_summary)}"
+    except Exception:
+        logger.exception("find_related_items failed for item %d", item_id)
+
+    categories = await queries.get_all_categories(db, user_id)
+    await message.reply(text, reply_markup=_post_save_keyboard(categories, item_id, cat["id"]), parse_mode="HTML")
+
+
+async def _manual_save_flow(message, db, user_id, ai_result,
+                            content_type, content_text, url, file_id, source, forward_url):
+    """MANUAL SAVE: show confirmation (old flow)."""
+    pending_key = f"{user_id}_{message.message_id}"
+    await set_state(db, pending_key, user_id, "save", {
+        "content_type": content_type,
+        "content_text": content_text,
+        "url": url,
+        "file_id": file_id,
+        "source": source,
+        "ai_result": ai_result,
+        "tg_message_id": message.message_id,
+        "forward_url": forward_url,
+    })
+
+    tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
+    text = (
+        f"🔖 <b>AI предлагает:</b>\n"
+        f"Категория: {ai_result['emoji']} {ai_result['category']}\n"
+        f"Теги: {tags_str}\n"
+    )
+    if ai_result.get("summary"):
+        text += f"<i>Саммари: {html.escape(ai_result['summary'])}</i>\n"
+
+    await message.reply(text, reply_markup=_confirm_keyboard(pending_key), parse_mode="HTML")
+
+
 async def _process_content(message: types.Message, db):
     """Process incoming content — auto-save or manual mode."""
     user_id = message.from_user.id
@@ -194,87 +279,18 @@ async def _process_content(message: types.Message, db):
         )
         return
 
-    # Get existing categories and tags for AI
-    categories = await queries.get_all_categories(db, user_id)
-    tags = await queries.get_all_tags(db, user_id)
-    tag_names = [t["tag"] for t in tags]
-
     # Classify with AI
-    ai_result = await classify_content(content_text, categories, tag_names)
-    if not ai_result:
-        ai_result = {"category": "Разное", "emoji": "📥", "tags": [], "summary": ""}
+    ai_result = await _classify_with_ai(db, user_id, content_text)
 
     # Check user preferences
     prefs = await queries.get_user_preferences(db, user_id)
 
     if prefs.get("auto_save", 1):
-        # AUTO-SAVE: save immediately
-        cat = await queries.get_category_by_name(db, user_id, ai_result["category"])
-        if not cat:
-            cat = await queries.get_category_by_name(db, user_id, "Разное")
-        if not cat:
-            cat = await queries.get_or_create_category(db, user_id, "Разное", "📥")
-        item_id = await queries.save_item(
-            db, user_id,
-            category_id=cat["id"],
-            content_type=content_type,
-            content_text=content_text,
-            tags=ai_result["tags"],
-            url=url, file_id=file_id, source=source,
-            ai_summary=ai_result.get("summary"),
-            tg_message_id=message.message_id,
-            forward_url=forward_url,
-        )
-
-        tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
-        text = f"✅ Сохранено в {cat.get('emoji', '📁')} <b>{cat['name']}</b>"
-        if tags_str:
-            text += f" / {tags_str}"
-        if ai_result.get("summary"):
-            text += f"\n<i>{html.escape(ai_result['summary'])}</i>"
-
-        # Find related items
-        try:
-            related = await find_related_items(
-                db, item_id, user_id,
-                category_id=cat["id"],
-                tags=ai_result["tags"],
-                source=source,
-            )
-            if related:
-                text += "\n\n🔗 <b>Похожие записи:</b>"
-                for r in related:
-                    r_summary = r.get("ai_summary") or r["content_text"][:60]
-                    text += f"\n  #{r['id']} {html.escape(r_summary)}"
-        except Exception:
-            logger.exception("find_related_items failed for item %d", item_id)
-
-        await message.reply(text, reply_markup=_post_save_keyboard(categories, item_id, cat["id"]), parse_mode="HTML")
-
+        await _auto_save_flow(message, db, user_id, ai_result,
+                              content_type, content_text, url, file_id, source, forward_url)
     else:
-        # MANUAL SAVE: show confirmation (old flow)
-        pending_key = f"{user_id}_{message.message_id}"
-        await set_state(db, pending_key, user_id, "save", {
-            "content_type": content_type,
-            "content_text": content_text,
-            "url": url,
-            "file_id": file_id,
-            "source": source,
-            "ai_result": ai_result,
-            "tg_message_id": message.message_id,
-            "forward_url": forward_url,
-        })
-
-        tags_str = " ".join(f"#{t}" for t in ai_result["tags"])
-        text = (
-            f"🔖 <b>AI предлагает:</b>\n"
-            f"Категория: {ai_result['emoji']} {ai_result['category']}\n"
-            f"Теги: {tags_str}\n"
-        )
-        if ai_result.get("summary"):
-            text += f"<i>Саммари: {html.escape(ai_result['summary'])}</i>\n"
-
-        await message.reply(text, reply_markup=_confirm_keyboard(pending_key), parse_mode="HTML")
+        await _manual_save_flow(message, db, user_id, ai_result,
+                                content_type, content_text, url, file_id, source, forward_url)
 
 
 # ── Message handlers ────────────────────────────────────────

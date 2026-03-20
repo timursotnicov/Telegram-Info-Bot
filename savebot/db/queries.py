@@ -599,6 +599,16 @@ async def get_pinned_items(db: aiosqlite.Connection, user_id: int, limit: int = 
 
 # ── Sources (channels) ─────────────────────────────────────
 
+async def resolve_source_name(db: aiosqlite.Connection, user_id: int, prefix: str) -> str | None:
+    """Find full source name by prefix (for truncated callback data)."""
+    cursor = await db.execute(
+        "SELECT source FROM items WHERE user_id = ? AND source LIKE ? LIMIT 1",
+        (user_id, f"{prefix}%"),
+    )
+    row = await cursor.fetchone()
+    return row["source"] if row else None
+
+
 async def get_all_sources(db: aiosqlite.Connection, user_id: int) -> list[dict]:
     """Get distinct sources with item counts, ordered by count DESC."""
     cursor = await db.execute(

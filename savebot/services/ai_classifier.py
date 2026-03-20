@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 
 import aiohttp
 
@@ -43,9 +44,25 @@ Example 3:
 Input: "Рецепт шарлотки с яблоками"
 Categories: 💻 Технологии, 💰 Финансы, 🏋️ Здоровье, 📚 Обучение, 🏢 Работа, 🎨 Творчество, 📥 Разное
 Output: {"category": "Разное", "emoji": "📥", "tags": ["выпечка", "рецепт"], "summary": "Рецепт яблочной шарлотки"}
+
+Example 4:
+Input: "Полный курс Python для начинающих: от переменных до веб-фреймворков"
+Categories: 💻 Технологии, 💰 Финансы, 🏋️ Здоровье, 📚 Обучение, 🏢 Работа, 🎨 Творчество, 📥 Разное
+Output: {"category": "Технологии", "emoji": "💻", "tags": ["python", "programming"], "summary": "Полный курс Python от основ до веб-фреймворков"}
 """
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+_CODE_BLOCK_RE = re.compile(r"^```\w*\n?", re.MULTILINE)
+_CODE_BLOCK_END_RE = re.compile(r"\n?```$")
+
+
+def _strip_code_blocks(text: str) -> str:
+    """Strip markdown code block fences from LLM response."""
+    text = text.strip()
+    text = _CODE_BLOCK_RE.sub("", text, count=1)
+    text = _CODE_BLOCK_END_RE.sub("", text, count=1)
+    return text.strip()
 
 
 async def classify_content(
@@ -112,13 +129,7 @@ async def classify_content(
                     data = await resp.json()
 
             text = data["choices"][0]["message"]["content"]
-            # Strip markdown code blocks if present
-            text = text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
+            text = _strip_code_blocks(text)
 
             result = json.loads(text)
             return {
@@ -134,9 +145,9 @@ async def classify_content(
             logger.error("AI classification network error: %s", e)
             return None
         except json.JSONDecodeError as e:
-            logger.error("AI classification JSON parse error: %s", e)
-            return None
+            logger.warning("AI classification JSON parse error with model %s: %s, trying next", model, e)
+            continue
         except KeyError as e:
-            logger.error("AI classification unexpected response structure, missing key: %s", e)
-            return None
+            logger.warning("AI classification missing key with model %s: %s, trying next", model, e)
+            continue
     return None

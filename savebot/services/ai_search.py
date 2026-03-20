@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import aiohttp
 
 from savebot.config import config
+from savebot.services.ai_classifier import _strip_code_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -99,18 +100,14 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
                         return None
                     data = await resp.json()
 
-            text = data["choices"][0]["message"]["content"].strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return text.strip()
+            text = data["choices"][0]["message"]["content"]
+            return _strip_code_blocks(text)
         except asyncio.TimeoutError:
             logger.warning("OpenRouter timeout with model %s, trying next", model)
             continue
-        except (aiohttp.ClientError, KeyError) as e:
-            logger.error("OpenRouter error: %s", e)
-            return None
+        except (aiohttp.ClientError, KeyError, json.JSONDecodeError) as e:
+            logger.warning("OpenRouter error with model %s: %s, trying next", model, e)
+            continue
     return None
 
 
