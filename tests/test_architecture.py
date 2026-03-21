@@ -9,10 +9,10 @@ import pytest
 
 BOT_PY = Path(__file__).resolve().parent.parent / "savebot" / "bot.py"
 
-EXPECTED_ROUTER_ORDER = ["settings", "manage", "menu", "browse", "inline", "save"]
+EXPECTED_ROUTER_ORDER = ["settings", "cleanup", "manage", "menu", "browse", "inline", "save"]
 
 ROUTER_ORDER_ERROR = (
-    "Router order MUST be: settings \u2192 manage \u2192 menu \u2192 browse \u2192 inline \u2192 save. "
+    "Router order MUST be: settings \u2192 cleanup \u2192 manage \u2192 menu \u2192 browse \u2192 inline \u2192 save. "
     "menu before browse (state dispatcher). save last (catch-all). "
     "See docs/decisions/002-router-order.md"
 )
@@ -46,6 +46,10 @@ CALLBACK_PATTERNS = [
     "autosave_change:99999",
     "autosave_delete:99999",
     "autosave_pin:99999",
+    "settings_cleanup",
+    "cleanup_yes:99",
+    "cleanup_skip:99",
+    "cleanup_done",
 ]
 
 

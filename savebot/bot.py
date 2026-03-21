@@ -12,7 +12,7 @@ from aiohttp import web
 
 from savebot.config import config
 from savebot.db.models import init_db
-from savebot.handlers import browse, inline, manage, menu, save, settings
+from savebot.handlers import browse, cleanup, inline, manage, menu, save, settings
 from savebot.middleware import ErrorMiddleware
 from savebot.scheduler import start_scheduler, stop_scheduler
 
@@ -59,6 +59,7 @@ async def main():
     # Register routers — settings first, then manage (commands), menu (keyboard + states),
     # browse, inline, save (catch-all last)
     dp.include_router(settings.router)
+    dp.include_router(cleanup.router)
     dp.include_router(manage.router)
     dp.include_router(menu.router)
     dp.include_router(browse.router)

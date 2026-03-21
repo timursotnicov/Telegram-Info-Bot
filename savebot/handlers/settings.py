@@ -41,6 +41,8 @@ def _render_settings(prefs: dict) -> tuple[str, InlineKeyboardMarkup]:
     if prefs.get("daily_brief_enabled", 0):
         rows.append([InlineKeyboardButton(text=f"⏰ Время брифа: {brief_time}", callback_data="settings_brief_time")])
 
+    rows.append([InlineKeyboardButton(text="\U0001f9f9 Умная уборка категорий", callback_data="settings_cleanup")])
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
 
     return text, keyboard
