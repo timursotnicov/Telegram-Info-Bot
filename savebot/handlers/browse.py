@@ -13,10 +13,11 @@ from savebot.db import queries
 from savebot.db.state_store import set_state
 from savebot.handlers.browse_core import (
     PAGE_SIZE, _CTX_MAP, _CTX_REV, _CTX_TITLES, SORT_LABELS,
-    _truncate_tag, _truncate_source, _format_item_short, _format_item_full,
-    _format_item, _format_item_list_entry, _sort_buttons, _recent_sort_buttons, _clickable_list_buttons,
-    _text_list_with_buttons, _back_button_for_ctx, _categories_markup, _more_markup,
-    _show_list, _show_item_view, _show_collections, _show_categories_msg,
+    _truncate_source, _format_item_short, _format_item_full,
+    _format_item_list_entry, _sort_buttons, _recent_sort_buttons,
+    _clickable_list_buttons, _text_list_with_buttons,
+    _back_button_for_ctx, _categories_markup,
+    _show_list, _show_item_view, _show_categories_msg,
     _extract_list_context,
 )
 from savebot.services.ai_search import parse_search_query
@@ -31,17 +32,7 @@ async def cmd_browse(message: types.Message, db=None):
     await _show_categories_msg(message, db=db)
 
 
-@router.callback_query(F.data == "bm:hub")
-async def on_hub(callback: types.CallbackQuery, db=None):
-    await callback.message.edit_text(
-        "📋 <b>Ещё</b>",
-        reply_markup=_more_markup(),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# ── Hub: Categories ────────────────────────────────────────
+# ── Categories list ────────────────────────────────────────
 
 @router.callback_query(F.data == "bm:cats")
 async def on_hub_cats(callback: types.CallbackQuery, db=None):
@@ -61,54 +52,6 @@ async def on_hub_cats(callback: types.CallbackQuery, db=None):
         parse_mode="HTML",
     )
     await callback.answer()
-
-
-# ── Category Sub-Menu ─────────────────────────────────────
-
-@router.callback_query(F.data.startswith("cm:"))
-async def on_category_menu(callback: types.CallbackQuery, db=None):
-    """Show category sub-menu: List, Channels, Latest item."""
-    cat_id = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-
-    cats = await queries.get_all_categories(db, user_id)
-    cat = next((c for c in cats if c["id"] == cat_id), None)
-    if not cat:
-        await callback.answer("Категория не найдена.")
-        return
-
-    emoji = cat.get("emoji", "📁")
-    count = cat.get("item_count", 0)
-
-    buttons = [
-        [InlineKeyboardButton(text="📋 Список", callback_data=f"browse_cat:{cat_id}:0")],
-        [InlineKeyboardButton(text="📨 Каналы", callback_data=f"cs:{cat_id}:0")],
-        [InlineKeyboardButton(text="🆕 Последняя запись", callback_data=f"cl:{cat_id}")],
-        [InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")],
-    ]
-
-    await callback.message.edit_text(
-        f"{emoji} <b>{cat['name']}</b> ({count})",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("cl:"))
-async def on_category_latest(callback: types.CallbackQuery, db=None):
-    """Jump to the latest item in a category."""
-    cat_id = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-
-    items = await queries.get_items_page_with_nums(
-        db, user_id, "category", context_id=cat_id, limit=1, offset=0,
-    )
-    if not items:
-        await callback.answer("В этой категории нет записей.")
-        return
-
-    await _show_item_view(callback, "c", str(cat_id), items[0]["id"], db=db)
 
 
 # ── Category Sources ──────────────────────────────────────
@@ -147,135 +90,6 @@ async def on_category_sources(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
-# ── Hub: Tags ──────────────────────────────────────────────
-
-@router.callback_query(F.data == "bm:tags")
-async def on_hub_tags(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    tags = await queries.get_all_tags(db, user_id)
-    if not tags:
-        await callback.answer("Тегов пока нет.")
-        return
-
-    buttons = []
-    row = []
-    for t in tags:
-        trunc = _truncate_tag(t["tag"])
-        row.append(InlineKeyboardButton(
-            text=f"#{t['tag']} ({t['count']})",
-            callback_data=f"tag_items:{trunc}:0",
-        ))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
-    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
-
-    await callback.message.edit_text(
-        "🏷 <b>Теги:</b>",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# ── Hub: Map ───────────────────────────────────────────────
-
-@router.callback_query(F.data == "bm:map")
-async def on_hub_map(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    categories = await queries.get_category_tag_map(db, user_id)
-    stats = await queries.get_stats(db, user_id)
-
-    if not categories:
-        await callback.answer("Карта знаний пуста.")
-        return
-
-    text = "🗺 <b>Карта знаний</b>\n\n"
-    for cat in categories:
-        emoji = cat.get("emoji", "📁")
-        count = cat.get("item_count", 0)
-        tags = " ".join(f"#{t}" for t in cat.get("top_tags", []))
-        text += f"{emoji} <b>{cat['name']}</b> ({count})\n"
-        if tags:
-            text += f"   {tags}\n"
-
-    text += f"\n📊 Всего: {stats['items']} записей"
-
-    buttons = []
-    for cat in categories:
-        emoji = cat.get("emoji", "📁")
-        buttons.append([InlineKeyboardButton(
-            text=f"{emoji} {cat['name']} →",
-            callback_data=f"browse_cat:{cat['id']}:0",
-        )])
-    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# ── Hub: Forgotten ─────────────────────────────────────────
-
-@router.callback_query(F.data == "bm:forg")
-async def on_hub_forgotten(callback: types.CallbackQuery, db=None):
-    await _show_list(callback, "forgotten", "0", 0, db=db)
-
-
-# ── Hub: Sources (channels) ──────────────────────────────
-
-@router.callback_query(F.data.startswith("bm:sources"))
-async def on_hub_sources(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-
-    # Parse sort mode: bm:sources, bm:sources:c, bm:sources:d
-    parts = callback.data.split(":")
-    sort_mode = parts[2] if len(parts) > 2 else "c"
-
-    if sort_mode == "d":
-        sources = await queries.get_all_sources_by_date(db, user_id, ascending=False)
-    else:
-        sources = await queries.get_all_sources(db, user_id)
-
-    if not sources:
-        await callback.answer("Нет пересланных записей из каналов.")
-        return
-
-    # Sort toggle buttons
-    sort_buttons = [
-        InlineKeyboardButton(
-            text=("✅ " if sort_mode == "c" else "") + "📊 По кол-ву",
-            callback_data="bm:sources:c",
-        ),
-        InlineKeyboardButton(
-            text=("✅ " if sort_mode == "d" else "") + "🕐 По дате",
-            callback_data="bm:sources:d",
-        ),
-    ]
-
-    buttons = [sort_buttons]
-    for src in sources:
-        name = src["source"]
-        trunc = _truncate_source(name)
-        buttons.append([InlineKeyboardButton(
-            text=f"📨 {name} ({src['count']})",
-            callback_data=f"src:{trunc}:0",
-        )])
-    buttons.append([InlineKeyboardButton(text="🔙 К категориям", callback_data="bm:cats")])
-
-    await callback.message.edit_text(
-        "📨 <b>Все каналы:</b>",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
 @router.callback_query(F.data.startswith("src:"))
 async def on_browse_source(callback: types.CallbackQuery, db=None):
     # src:{source_name}:{offset}
@@ -287,52 +101,6 @@ async def on_browse_source(callback: types.CallbackQuery, db=None):
     await _show_list(callback, "source", full_source or source_name, offset, db=db)
 
 
-# ── Hub: Collections ──────────────────────────────────────
-
-@router.callback_query(F.data == "bm:colls")
-async def on_hub_colls(callback: types.CallbackQuery, db=None):
-    await _show_collections(callback, db=db)
-
-
-@router.message(Command("collections"))
-async def cmd_collections(message: types.Message, db=None):
-    await _show_collections(message, db=db)
-
-
-@router.callback_query(F.data.startswith("bc:"))
-async def on_browse_collection(callback: types.CallbackQuery, db=None):
-    # bc:{collection_id}:{offset}
-    parts = callback.data.split(":")
-    coll_id = parts[1]
-    offset = int(parts[2])
-    await _show_list(callback, "collection", coll_id, offset, db=db)
-
-
-@router.callback_query(F.data == "bm:newcoll")
-async def on_hub_newcoll(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    await set_state(db, f"new_collection_{user_id}", user_id, "new_collection", {})
-    await callback.message.edit_text(
-        "📁 <b>Новая коллекция</b>\n\nВведите название:",
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# ── Hub: New Category ─────────────────────────────────────
-
-@router.callback_query(F.data == "bm:newcat")
-async def on_hub_newcat(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    logger.info("bm:newcat callback: setting new_browse_cat state for user %d", user_id)
-    await set_state(db, f"new_browse_cat_{user_id}", user_id, "new_browse_cat", {})
-    await callback.message.edit_text(
-        "📁 <b>Новая категория</b>\n\nВведите название:",
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
 # ── Clickable List View ───────────────────────────────────
 
 @router.callback_query(F.data.startswith("browse_cat:"))
@@ -342,20 +110,6 @@ async def on_browse_category(callback: types.CallbackQuery, db=None):
     offset = int(parts[2])
     sort_by = parts[3] if len(parts) > 3 else "d"
     await _show_list(callback, "category", cat_id, offset, db=db, sort_by=sort_by)
-
-
-@router.callback_query(F.data.startswith("tag_items:"))
-async def on_tag_items(callback: types.CallbackQuery, db=None):
-    parts = callback.data.split(":")
-    tag = parts[1]
-    offset = int(parts[2])
-    await _show_list(callback, "tag", tag, offset, db=db)
-
-
-@router.callback_query(F.data == "tags_back")
-async def on_tags_back(callback: types.CallbackQuery, db=None):
-    # Go back to tag cloud
-    await on_hub_tags(callback, db=db)
 
 
 # ── List pagination callback ──────────────────────────────
@@ -745,91 +499,13 @@ async def on_action_related(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("va:coll:"))
-async def on_action_add_to_collection(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    item_id = int(callback.data.split(":")[2])
-
-    colls = await queries.get_collections(db, user_id)
-
-    buttons = []
-    for coll in colls:
-        emoji = coll.get("emoji", "📁")
-        buttons.append([InlineKeyboardButton(
-            text=f"{emoji} {coll['name']}",
-            callback_data=f"va:ac:{item_id}:{coll['id']}",
-        )])
-    buttons.append([InlineKeyboardButton(text="➕ Новая", callback_data=f"va:nc:{item_id}")])
-    buttons.append([InlineKeyboardButton(text="🔙 К записи", callback_data=f"vi:r:0:{item_id}")])
-
-    await callback.message.edit_text(
-        "📁 <b>Добавить в коллекцию:</b>",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("va:ac:"))
-async def on_action_add_to_coll_confirm(callback: types.CallbackQuery, db=None):
-    # va:ac:{item_id}:{coll_id}
-    user_id = callback.from_user.id
-    parts = callback.data.split(":")
-    item_id = int(parts[2])
-    coll_id = int(parts[3])
-
-    added = await queries.add_to_collection(db, user_id, coll_id, item_id)
-    if added:
-        await callback.answer("✅ Добавлено в коллекцию")
-    else:
-        await callback.answer("Уже в коллекции или ошибка")
-
-    # Return to item view
-    await _show_item_view(callback, "r", "0", item_id, db=db)
-
-
-@router.callback_query(F.data.startswith("va:nc:"))
-async def on_action_new_collection_for_item(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    item_id = int(callback.data.split(":")[2])
-
-    await set_state(db, f"new_collection_{user_id}", user_id, "new_collection", {"item_id": item_id})
-    await callback.message.edit_text(
-        "📁 <b>Новая коллекция</b>\n\nВведите название:",
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# ── Legacy /tags command ──────────────────────────────────
-
 @router.message(Command("tags"))
-async def cmd_tags(message: types.Message, db=None):
-    user_id = message.from_user.id
-    tags = await queries.get_all_tags(db, user_id)
-    if not tags:
-        await message.reply("Тегов пока нет.")
-        return
+async def cmd_tags(message: types.Message, **kwargs):
+    await message.reply("Эта команда больше не доступна. Используйте 📂 Все записи.")
 
-    buttons = []
-    row = []
-    for t in tags:
-        trunc = _truncate_tag(t["tag"])
-        row.append(InlineKeyboardButton(
-            text=f"#{t['tag']} ({t['count']})",
-            callback_data=f"tag_items:{trunc}:0",
-        ))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-    if row:
-        buttons.append(row)
-
-    await message.reply(
-        "🏷 <b>Теги:</b>",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
+@router.message(Command("collections"))
+async def cmd_collections(message: types.Message, **kwargs):
+    await message.reply("Эта команда больше не доступна. Используйте 📂 Все записи.")
 
 
 # ── /search ───────────────────────────────────────────────
@@ -1003,60 +679,10 @@ async def cmd_unpin(message: types.Message, db=None):
 # ── /map ──────────────────────────────────────────────────
 
 @router.message(Command("map"))
-async def cmd_map(message: types.Message, db=None):
-    user_id = message.from_user.id
-    categories = await queries.get_category_tag_map(db, user_id)
-    stats = await queries.get_stats(db, user_id)
+async def cmd_map(message: types.Message, **kwargs):
+    await message.reply("Эта команда больше не доступна. Используйте 📂 Все записи.")
 
-    if not categories:
-        await message.reply("🗺 Карта знаний пуста. Сохрани что-нибудь!")
-        return
-
-    text = "🗺 <b>Карта знаний</b>\n\n"
-    for cat in categories:
-        emoji = cat.get("emoji", "📁")
-        count = cat.get("item_count", 0)
-        tags = " ".join(f"#{t}" for t in cat.get("top_tags", []))
-        text += f"{emoji} <b>{cat['name']}</b> ({count})\n"
-        if tags:
-            text += f"   {tags}\n"
-
-    text += f"\n📊 Всего: {stats['items']} записей, {stats['categories']} категорий, {stats['tags']} тегов"
-
-    buttons = []
-    for cat in categories:
-        emoji = cat.get("emoji", "📁")
-        buttons.append([InlineKeyboardButton(
-            text=f"{emoji} {cat['name']} →",
-            callback_data=f"browse_cat:{cat['id']}:0",
-        )])
-
-    await message.reply(
-        text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
-
-
-# ── /forgotten ────────────────────────────────────────────
 
 @router.message(Command("forgotten"))
-async def cmd_forgotten(message: types.Message, db=None):
-    user_id = message.from_user.id
-    items = await queries.get_items_page_with_nums(db, user_id, "forgotten", limit=PAGE_SIZE, offset=0)
-
-    if not items:
-        await message.reply("✨ Нет забытых записей! Все записи свежие или закреплены.")
-        return
-
-    all_items = await queries.get_items_page_with_nums(db, user_id, "forgotten", limit=10000, offset=0)
-    total = len(all_items)
-
-    buttons = _clickable_list_buttons(items, "f", "0", 0, total)
-    buttons.append([_back_button_for_ctx("f")])
-
-    await message.reply(
-        f"🕸 <b>Забытые записи</b> ({total})",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        parse_mode="HTML",
-    )
+async def cmd_forgotten(message: types.Message, **kwargs):
+    await message.reply("Эта команда больше не доступна. Используйте 📂 Все записи.")

@@ -180,21 +180,6 @@ def _format_item_full(item: dict, position: int | None = None, total: int | None
     return "\n".join(parts)
 
 
-def _format_item(item: dict) -> str:
-    """Legacy short format for search results etc."""
-    tags = " ".join(f"#{t}" for t in item.get("tags", []))
-    text = f"<b>#{item['id']}</b> "
-    if item.get("ai_summary"):
-        text += f"{item['ai_summary']}"
-    else:
-        text += f"{item['content_text'][:100]}"
-    if tags:
-        text += f"\n{tags}"
-    if item.get("url"):
-        text += f"\n\U0001f517 {item['url']}"
-    return text
-
-
 def _clickable_list_buttons(
     items: list[dict],
     ctx_short: str,
@@ -328,14 +313,6 @@ def _back_button_for_ctx(ctx_short: str, ctx_id: str | int = "0") -> InlineKeybo
         return InlineKeyboardButton(text="\U0001f519 Все записи", callback_data="bm:cats")
 
 
-def _more_markup() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="\U0001f3f7 \u0422\u0435\u0433\u0438", callback_data="bm:tags")],
-        [InlineKeyboardButton(text="\U0001f4c1 \u041a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0438", callback_data="bm:colls")],
-        [InlineKeyboardButton(text="\U0001f5fa \u041a\u0430\u0440\u0442\u0430 \u0437\u043d\u0430\u043d\u0438\u0439", callback_data="bm:map")],
-        [InlineKeyboardButton(text="\u2795 \u041d\u043e\u0432\u0430\u044f \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f", callback_data="bm:newcat")],
-        [InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f\u043c", callback_data="bm:cats")],
-    ])
 
 
 def _categories_markup(categories: list[dict]) -> InlineKeyboardMarkup:
@@ -519,12 +496,11 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     if item.get("forward_url"):
         buttons.append([InlineKeyboardButton(text="\U0001f4e8 \u041e\u0440\u0438\u0433\u0438\u043d\u0430\u043b", url=item["forward_url"])])
 
-    # Action row 2: tags, note, related, collection
+    # Action row 2: tags, note, related (no collection)
     actions2 = []
-    actions2.append(InlineKeyboardButton(text="\U0001f3f7 \u0422\u0435\u0433\u0438", callback_data=f"va:tags:{item_id}"))
-    actions2.append(InlineKeyboardButton(text="\u270f\ufe0f \u0417\u0430\u043c\u0435\u0442\u043a\u0430", callback_data=f"va:note:{item_id}"))
-    actions2.append(InlineKeyboardButton(text="\U0001f517 \u041f\u043e\u0445\u043e\u0436\u0438\u0435", callback_data=f"va:rel:{item_id}"))
-    actions2.append(InlineKeyboardButton(text="\U0001f4c1+", callback_data=f"va:coll:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="\U0001f3f7 Теги", callback_data=f"va:tags:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="\u270f\ufe0f Заметка", callback_data=f"va:note:{item_id}"))
+    actions2.append(InlineKeyboardButton(text="\U0001f517 Похожие", callback_data=f"va:rel:{item_id}"))
     buttons.append(actions2)
 
     # Back to list row
@@ -542,30 +518,3 @@ async def _show_item_view(callback: types.CallbackQuery, ctx_short: str, ctx_id:
     await callback.answer()
 
 
-async def _show_collections(callback_or_msg, db=None):
-    """Show collections list. Works with both callback and message."""
-    if isinstance(callback_or_msg, types.CallbackQuery):
-        user_id = callback_or_msg.from_user.id
-    else:
-        user_id = callback_or_msg.from_user.id
-
-    colls = await queries.get_collections(db, user_id)
-
-    buttons = []
-    for coll in colls:
-        emoji = coll.get("emoji", "\U0001f4c1")
-        buttons.append([InlineKeyboardButton(
-            text=f"{emoji} {coll['name']} ({coll['item_count']})",
-            callback_data=f"bc:{coll['id']}:0",
-        )])
-    buttons.append([InlineKeyboardButton(text="\u2795 \u041d\u043e\u0432\u0430\u044f \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u044f", callback_data="bm:newcoll")])
-    buttons.append([InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f\u043c", callback_data="bm:cats")])
-
-    text = "\U0001f4c1 <b>\u041a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0438:</b>" if colls else "\U0001f4c1 <b>\u041a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</b>"
-    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    if isinstance(callback_or_msg, types.CallbackQuery):
-        await callback_or_msg.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
-        await callback_or_msg.answer()
-    else:
-        await callback_or_msg.reply(text, reply_markup=markup, parse_mode="HTML")

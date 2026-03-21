@@ -239,14 +239,6 @@ async def on_cat_back(callback: types.CallbackQuery, db=None):
     await callback.answer()
 
 
-@router.callback_query(F.data == "cat_add")
-async def on_cat_add(callback: types.CallbackQuery, db=None):
-    user_id = callback.from_user.id
-    await set_state(db, f"new_browse_cat_{user_id}", user_id, "new_browse_cat", {})
-    await callback.message.edit_text("Введите название новой категории:", parse_mode="HTML")
-    await callback.answer()
-
-
 # ── /edit ───────────────────────────────────────────────────
 
 @router.message(Command("edit"))
