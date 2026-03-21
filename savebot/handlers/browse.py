@@ -49,17 +49,14 @@ async def on_hub_cats(callback: types.CallbackQuery, db=None):
     categories = await queries.get_all_categories(db, user_id)
     if not categories:
         await callback.message.edit_text(
-            "📂 <b>Категорий пока нет.</b>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📋 Ещё", callback_data="bm:hub")]
-            ]),
+            "📂 <b>Записей пока нет.</b>",
             parse_mode="HTML",
         )
         await callback.answer()
         return
 
     await callback.message.edit_text(
-        "📂 <b>Категории:</b>",
+        "📂 <b>Все записи:</b>",
         reply_markup=_categories_markup(categories),
         parse_mode="HTML",
     )
@@ -136,7 +133,7 @@ async def on_category_sources(callback: types.CallbackQuery, db=None):
             text=f"📨 {name} ({src['count']})",
             callback_data=f"src:{trunc}:0",
         )])
-    buttons.append([InlineKeyboardButton(text="🔙 К категории", callback_data=f"cm:{cat_id}")])
+    buttons.append([InlineKeyboardButton(text="🔙 К списку", callback_data=f"browse_cat:{cat_id}:0")])
 
     cats = await queries.get_all_categories(db, user_id)
     cat = next((c for c in cats if c["id"] == cat_id), None)

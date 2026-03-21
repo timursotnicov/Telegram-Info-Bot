@@ -214,15 +214,11 @@ def _clickable_list_buttons(
 def _back_button_for_ctx(ctx_short: str, ctx_id: str | int = "0") -> InlineKeyboardButton:
     """Return the appropriate back button for a given context."""
     if ctx_short == "c":
-        return InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438", callback_data=f"cm:{ctx_id}")
-    elif ctx_short == "t":
-        return InlineKeyboardButton(text="\U0001f519 \u041a \u0442\u0435\u0433\u0430\u043c", callback_data="tags_back")
-    elif ctx_short == "o":
-        return InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u043e\u043b\u043b\u0435\u043a\u0446\u0438\u044f\u043c", callback_data="bm:colls")
+        return InlineKeyboardButton(text="\U0001f519 Все записи", callback_data="bm:cats")
     elif ctx_short == "s":
-        return InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u0430\u043d\u0430\u043b\u0430\u043c", callback_data="bm:sources")
+        return InlineKeyboardButton(text="\U0001f519 Все записи", callback_data="bm:cats")
     else:
-        return InlineKeyboardButton(text="\U0001f519 \u041a \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f\u043c", callback_data="bm:cats")
+        return InlineKeyboardButton(text="\U0001f519 Все записи", callback_data="bm:cats")
 
 
 def _more_markup() -> InlineKeyboardMarkup:
@@ -236,18 +232,14 @@ def _more_markup() -> InlineKeyboardMarkup:
 
 
 def _categories_markup(categories: list[dict]) -> InlineKeyboardMarkup:
-    """Build category list buttons with footer."""
+    """Build category list buttons — tap goes directly to item list."""
     buttons = []
     for cat in categories:
         emoji = cat.get("emoji", "\U0001f4c1")
         buttons.append([InlineKeyboardButton(
             text=f"{emoji} {cat['name']} ({cat['item_count']})",
-            callback_data=f"cm:{cat['id']}",
+            callback_data=f"browse_cat:{cat['id']}:0",
         )])
-    buttons.append([
-        InlineKeyboardButton(text="\U0001f4e8 \u0412\u0441\u0435 \u043a\u0430\u043d\u0430\u043b\u044b", callback_data="bm:sources"),
-        InlineKeyboardButton(text="\U0001f4cb \u0415\u0449\u0451", callback_data="bm:hub"),
-    ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -272,15 +264,12 @@ async def _show_categories_msg(message: types.Message, db=None):
     categories = await queries.get_all_categories(db, user_id)
     if not categories:
         await message.reply(
-            "\U0001f4c2 <b>\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0439 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</b>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="\U0001f4cb \u0415\u0449\u0451", callback_data="bm:hub")]
-            ]),
+            "\U0001f4c2 <b>Записей пока нет.</b> Отправьте мне текст, ссылку или файл!",
             parse_mode="HTML",
         )
         return
     await message.reply(
-        "\U0001f4c2 <b>\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438:</b>",
+        "\U0001f4c2 <b>Все записи:</b>",
         reply_markup=_categories_markup(categories),
         parse_mode="HTML",
     )
@@ -338,7 +327,14 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         buttons.insert(0, _sort_buttons(int(ctx_id), sort_by))
     elif context_type == "recent":
         buttons.insert(0, _recent_sort_buttons(sort_by))
-    buttons.append([_back_button_for_ctx(ctx_short, ctx_id)])
+    # Footer buttons
+    footer = [_back_button_for_ctx(ctx_short, ctx_id)]
+    if context_type == "category":
+        footer.insert(0, InlineKeyboardButton(
+            text="\U0001f4e8 Каналы",
+            callback_data=f"cs:{ctx_id}:0",
+        ))
+    buttons.append(footer)
 
     await callback.message.edit_text(
         title,
