@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="🕐 Недавние"), KeyboardButton(text="🔍 Поиск")],
-        [KeyboardButton(text="📂 Категории"), KeyboardButton(text="📌 Закрепленные")],
+        [KeyboardButton(text="📂 Все записи"), KeyboardButton(text="🔍 Поиск")],
+        [KeyboardButton(text="🕐 Недавние"), KeyboardButton(text="⚙️ Настройки")],
     ],
     resize_keyboard=True,
     is_persistent=True,
@@ -53,11 +53,10 @@ async def cmd_start(message: types.Message, **kwargs):
         "Просто отправь мне текст, ссылку, фото или файл — "
         "я сохраню и организую автоматически.\n\n"
         "Используй кнопки внизу для быстрого доступа:\n"
-        "🕐 Недавние — все записи по порядку\n"
+        "📂 Все записи — просмотр по категориям\n"
         "🔍 Поиск — найти нужное\n"
-        "📂 Категории — просмотр по категориям\n"
-        "📌 Закрепленные — важные записи\n\n"
-        "⚙️ Настройки: /settings\n"
+        "🕐 Недавние — последние записи\n"
+        "⚙️ Настройки — настройки бота\n"
         "ℹ️ Подробнее: /help",
         reply_markup=MAIN_KEYBOARD,
         parse_mode="HTML",

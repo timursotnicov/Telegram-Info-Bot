@@ -18,9 +18,10 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 BUTTON_TEXTS = {
-    "🕐 Недавние", "🔍 Поиск", "📂 Категории", "📌 Закрепленные",
-    # Backward compat: old English buttons cached on some clients
-    "📂 Browse", "🔍 Search", "📌 Pinned", "🕐 Recent", "⚙️ Settings",
+    "📂 Все записи", "🔍 Поиск", "🕐 Недавние", "⚙️ Настройки",
+    # Backward compat: old buttons cached on some clients
+    "📂 Категории", "📂 Browse", "🔍 Search", "📌 Pinned",
+    "🕐 Recent", "⚙️ Settings", "📌 Закрепленные",
 }
 
 
@@ -159,12 +160,11 @@ async def handle_keyboard_button(message: types.Message, db=None):
 
     text = message.text
 
-    if text in ("📂 Категории", "📂 Browse"):
+    if text in ("📂 Все записи", "📂 Категории", "📂 Browse"):
         from savebot.handlers.browse import cmd_browse
         await cmd_browse(message, db=db)
 
     elif text in ("🔍 Поиск", "🔍 Search"):
-        user_id = message.from_user.id
         await set_state(db, f"search_prompt_{user_id}", user_id, "search_prompt", {})
         await message.reply("🔍 Введите поисковый запрос:")
 
@@ -176,6 +176,6 @@ async def handle_keyboard_button(message: types.Message, db=None):
         from savebot.handlers.browse import cmd_recent
         await cmd_recent(message, db=db)
 
-    elif text == "⚙️ Settings":
+    elif text in ("⚙️ Настройки", "⚙️ Settings"):
         from savebot.handlers.settings import cmd_settings
         await cmd_settings(message, db=db)
