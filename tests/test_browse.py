@@ -7,19 +7,20 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from savebot.handlers.browse import (
     _back_button_for_ctx,
     _format_item_short,
-    _clickable_list_buttons,
     _extract_list_context,
-    _more_markup,
     _categories_markup,
     cmd_browse,
     cmd_ask,
-    on_hub,
     on_hub_cats,
     on_list_delete_confirm,
     on_list_delete_cancel,
     on_action_delete,
     on_action_delete_confirm,
     on_action_delete_cancel,
+)
+from savebot.handlers.browse_core import (
+    _text_list_with_buttons,
+    _format_item_list_entry,
 )
 from savebot.db import queries
 from tests.conftest import make_callback, make_message
@@ -32,22 +33,18 @@ USER_ID = 1
 class TestBackButtonForCtx:
     def test_category_context(self):
         btn = _back_button_for_ctx("c", 5)
-        assert btn.callback_data == "cm:5"
-        assert "категории" in btn.text.lower()
+        assert btn.callback_data == "bm:cats"
+        assert "Все записи" in btn.text
 
-    def test_tag_context(self):
-        btn = _back_button_for_ctx("t")
-        assert btn.callback_data == "tags_back"
-        assert "тегам" in btn.text.lower()
+    def test_source_context(self):
+        btn = _back_button_for_ctx("s")
+        assert btn.callback_data == "bm:cats"
+        assert "Все записи" in btn.text
 
-    def test_collection_context(self):
-        btn = _back_button_for_ctx("o")
-        assert btn.callback_data == "bm:colls"
-        assert "коллекциям" in btn.text.lower()
-
-    def test_unknown_context_defaults_to_categories(self):
+    def test_unknown_context_defaults_to_cats(self):
         btn = _back_button_for_ctx("x")
         assert btn.callback_data == "bm:cats"
+        assert "Все записи" in btn.text
 
 
 # ── _format_item_short ───────────────────────────────────
@@ -68,35 +65,99 @@ class TestFormatItemShort:
         assert _format_item_short(item) == "(без текста)"
 
 
-# ── _clickable_list_buttons ──────────────────────────────
+# ── _format_item_list_entry ─────────────────────────────
 
-class TestClickableListButtons:
-    def test_normal_items_have_trash_button(self):
-        items = [
-            {"id": 1, "display_num": 1, "content_text": "First"},
-            {"id": 2, "display_num": 2, "content_text": "Second"},
-        ]
-        buttons = _clickable_list_buttons(items, "c", "5", 0, 2)
-        # Each item row: [item_button, trash_button]
-        assert len(buttons[0]) == 2
-        assert buttons[0][1].text == "🗑"
-        assert buttons[0][1].callback_data.startswith("vd:")
+class TestFormatItemListEntry:
+    def test_uses_ai_summary(self):
+        item = {"ai_summary": "Summary", "content_text": "Text", "tags": []}
+        result = _format_item_list_entry(item, 1)
+        assert "<b>1.</b>" in result
+        assert "Summary" in result
 
-    def test_deleting_item_shows_confirm_row(self):
+    def test_truncates_title_to_80(self):
+        item = {"ai_summary": "A" * 100, "tags": []}
+        result = _format_item_list_entry(item, 1)
+        # Title should be truncated to 77 + "..."
+        assert "..." in result
+
+    def test_truncates_meta_to_60(self):
+        item = {
+            "content_text": "Short",
+            "category_emoji": "📁",
+            "category_name": "A" * 30,
+            "source": "B" * 30,
+            "created_at": "2026-01-01",
+            "tags": ["tag1", "tag2", "tag3"],
+        }
+        result = _format_item_list_entry(item, 1)
+        # Meta line should end with "..."
+        lines = result.split("\n")
+        if len(lines) > 1:
+            meta = lines[1].strip()
+            assert len(meta) <= 63  # 60 + "..."
+
+    def test_no_text_fallback(self):
+        item = {"tags": []}
+        result = _format_item_list_entry(item, 1)
+        assert "(без текста)" in result
+
+
+# ── _text_list_with_buttons ─────────────────────────────
+
+class TestTextListWithButtons:
+    def test_returns_tuple(self):
         items = [
-            {"id": 1, "display_num": 1, "content_text": "First"},
-            {"id": 2, "display_num": 2, "content_text": "Second"},
+            {"id": 1, "display_num": 1, "content_text": "First", "tags": []},
+            {"id": 2, "display_num": 2, "content_text": "Second", "tags": []},
         ]
-        buttons = _clickable_list_buttons(items, "c", "5", 0, 2, deleting_item_id=1)
-        # Item 1 should be confirmation row: [label, ✅, ❌]
-        assert len(buttons[0]) == 3
-        assert "Удалить" in buttons[0][0].text
-        assert buttons[0][1].text == "✅"
-        assert buttons[0][1].callback_data.startswith("vy:")
-        assert buttons[0][2].text == "❌"
-        assert buttons[0][2].callback_data.startswith("vx:")
-        # Item 2 should be normal
-        assert buttons[1][1].text == "🗑"
+        text, buttons = _text_list_with_buttons(items, "c", "5", 0, 2)
+        assert isinstance(text, str)
+        assert isinstance(buttons, list)
+        assert "First" in text
+        assert "Second" in text
+
+    def test_number_buttons_row(self):
+        items = [
+            {"id": 1, "display_num": 1, "content_text": "First", "tags": []},
+            {"id": 2, "display_num": 2, "content_text": "Second", "tags": []},
+        ]
+        text, buttons = _text_list_with_buttons(items, "c", "5", 0, 2)
+        # First row should be number buttons
+        assert buttons[0][0].text == "1"
+        assert buttons[0][1].text == "2"
+        assert buttons[0][0].callback_data == "vi:c:5:1"
+
+    def test_deleting_item_has_noop_placeholder(self):
+        items = [
+            {"id": 1, "display_num": 1, "content_text": "First", "tags": []},
+            {"id": 2, "display_num": 2, "content_text": "Second", "tags": []},
+        ]
+        text, buttons = _text_list_with_buttons(items, "c", "5", 0, 2, deleting_item_id=1)
+        # Number row should have noop placeholder for item 1
+        number_row = buttons[0]
+        assert number_row[0].callback_data == "noop"
+        assert number_row[1].callback_data == "vi:c:5:2"
+        # Text should show strikethrough
+        assert "<s>" in text
+
+    def test_message_under_4096_chars(self):
+        """Formatted text for 5 items should stay under Telegram's 4096 char limit."""
+        items = [
+            {
+                "id": i, "display_num": i,
+                "ai_summary": "A" * 80,
+                "content_text": "B" * 200,
+                "category_emoji": "📁", "category_name": "Category",
+                "source": "Source Channel",
+                "created_at": "2026-01-01",
+                "tags": ["tag1", "tag2", "tag3"],
+            }
+            for i in range(1, 6)
+        ]
+        text, buttons = _text_list_with_buttons(items, "c", "5", 0, 5)
+        # Title + text should be well under 4096
+        full_text = f"📁 Category (5)\n\n{text}"
+        assert len(full_text) < 4096
 
 
 # ── _extract_list_context ────────────────────────────────
@@ -159,7 +220,7 @@ class TestCmdBrowse:
         await cmd_browse(msg, db=db)
         msg.reply.assert_called_once()
         call_kwargs = msg.reply.call_args
-        assert "Категории" in call_kwargs[0][0]
+        assert "Все записи" in call_kwargs[0][0]
 
     @pytest.mark.asyncio
     async def test_empty_shows_no_categories(self, db):
@@ -169,22 +230,6 @@ class TestCmdBrowse:
         assert "нет" in msg.reply.call_args[0][0].lower()
 
 
-class TestOnHub:
-    @pytest.mark.asyncio
-    async def test_shows_more_menu(self, db):
-        cb = make_callback(USER_ID, "bm:hub")
-        await on_hub(cb, db=db)
-        cb.message.edit_text.assert_called_once()
-        call_args = cb.message.edit_text.call_args
-        assert "Ещё" in call_args[0][0]
-        # Check markup has expected buttons
-        markup = call_args[1]["reply_markup"]
-        all_cb = [btn.callback_data for row in markup.inline_keyboard for btn in row]
-        assert "bm:colls" in all_cb
-        assert "bm:map" in all_cb
-        assert "bm:cats" in all_cb
-
-
 class TestOnHubCats:
     @pytest.mark.asyncio
     async def test_with_categories(self, db):
@@ -192,7 +237,7 @@ class TestOnHubCats:
         cb = make_callback(USER_ID, "bm:cats")
         await on_hub_cats(cb, db=db)
         cb.message.edit_text.assert_called_once()
-        assert "Категории" in cb.message.edit_text.call_args[0][0]
+        assert "Все записи" in cb.message.edit_text.call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_empty_categories(self, db):
@@ -309,45 +354,35 @@ class TestActionDeleteCancel:
         assert "отменено" in call_text.lower()
 
 
-# ── _more_markup ──────────────────────────────────────────
-
-class TestMoreMarkup:
-    def test_more_markup_no_forgotten(self):
-        markup = _more_markup()
-        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
-        for text in all_texts:
-            assert "Забытые" not in text, "More menu should not contain 'Забытые'"
-
-    def test_more_markup_no_channels(self):
-        markup = _more_markup()
-        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
-        for text in all_texts:
-            assert "Каналы" not in text, "More menu should not contain 'Каналы'"
-
-
 # ── _categories_markup ────────────────────────────────────
 
 class TestCategoriesMarkup:
-    def test_categories_markup_no_tags(self):
+    def test_direct_navigation(self):
+        """Category buttons should go directly to browse_cat (not cm: sub-menu)."""
         cats = [{"id": 1, "name": "Work", "emoji": "💼", "item_count": 3}]
         markup = _categories_markup(cats)
-        all_texts = [btn.text for row in markup.inline_keyboard for btn in row]
-        for text in all_texts:
-            assert "Теги" not in text, "Category markup footer should not contain 'Теги'"
+        btn = markup.inline_keyboard[0][0]
+        assert btn.callback_data == "browse_cat:1:0"
+
+    def test_no_footer_buttons(self):
+        """Category markup should have no footer (tags, collections, hub)."""
+        cats = [{"id": 1, "name": "Work", "emoji": "💼", "item_count": 3}]
+        markup = _categories_markup(cats)
+        assert len(markup.inline_keyboard) == 1  # Only category buttons, no footer
 
 
-# ── cmd_ask ───────────────────────────────────────────────
+# ── Sort buttons ─────────────────────────────────────────
 
 class TestSortButtons:
     def test_sort_buttons_renders_4(self):
         """_sort_buttons should return 4 buttons."""
-        from savebot.handlers.browse import _sort_buttons
+        from savebot.handlers.browse_core import _sort_buttons
         row = _sort_buttons(cat_id=5)
         assert len(row) == 4
 
     def test_sort_buttons_highlight(self):
         """Active sort should have ✅ prefix."""
-        from savebot.handlers.browse import _sort_buttons
+        from savebot.handlers.browse_core import _sort_buttons
         row = _sort_buttons(cat_id=5, active_sort="p")
         texts = [btn.text for btn in row]
         # "p" button should have ✅
@@ -357,12 +392,13 @@ class TestSortButtons:
 
     def test_sort_default_is_date(self):
         """browse_cat callback without sort segment should default to 'd'."""
-        # Parse like on_browse_category does
         callback_data = "browse_cat:5:0"
         parts = callback_data.split(":")
         sort_by = parts[3] if len(parts) > 3 else "d"
         assert sort_by == "d"
 
+
+# ── cmd_ask ───────────────────────────────────────────────
 
 class TestCmdAsk:
     @pytest.mark.asyncio
@@ -372,3 +408,44 @@ class TestCmdAsk:
         msg.reply.assert_called_once()
         reply_text = msg.reply.call_args[0][0]
         assert "временно отключена" in reply_text
+
+
+# ── Backward compat: old keyboard buttons ────────────────
+
+class TestOldKeyboardBackwardCompat:
+    def test_old_buttons_in_button_texts(self):
+        """Old cached buttons should still be recognized by menu.py."""
+        from savebot.handlers.menu import BUTTON_TEXTS
+        old_buttons = [
+            "📂 Категории", "📂 Browse", "🔍 Search",
+            "📌 Pinned", "🕐 Recent", "⚙️ Settings", "📌 Закрепленные",
+        ]
+        for btn in old_buttons:
+            assert btn in BUTTON_TEXTS, f"Old button '{btn}' missing from BUTTON_TEXTS"
+
+    def test_new_buttons_in_button_texts(self):
+        """New buttons should be in BUTTON_TEXTS."""
+        from savebot.handlers.menu import BUTTON_TEXTS
+        new_buttons = ["📂 Все записи", "🔍 Поиск", "🕐 Недавние", "⚙️ Настройки"]
+        for btn in new_buttons:
+            assert btn in BUTTON_TEXTS, f"New button '{btn}' missing from BUTTON_TEXTS"
+
+
+# ── Stub commands ────────────────────────────────────────
+
+class TestStubCommands:
+    @pytest.mark.asyncio
+    async def test_tags_stub(self, db):
+        from savebot.handlers.browse import cmd_tags
+        msg = make_message(USER_ID, text="/tags")
+        await cmd_tags(msg)
+        msg.reply.assert_called_once()
+        assert "больше не доступна" in msg.reply.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_collections_stub(self, db):
+        from savebot.handlers.browse import cmd_collections
+        msg = make_message(USER_ID, text="/collections")
+        await cmd_collections(msg)
+        msg.reply.assert_called_once()
+        assert "больше не доступна" in msg.reply.call_args[0][0]
