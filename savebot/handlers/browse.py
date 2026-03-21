@@ -14,7 +14,7 @@ from savebot.db.state_store import set_state
 from savebot.handlers.browse_core import (
     PAGE_SIZE, _CTX_MAP, _CTX_REV, _CTX_TITLES, SORT_LABELS,
     _truncate_tag, _truncate_source, _format_item_short, _format_item_full,
-    _format_item, _sort_buttons, _recent_sort_buttons, _clickable_list_buttons,
+    _format_item, _format_item_list_entry, _sort_buttons, _recent_sort_buttons, _clickable_list_buttons,
     _text_list_with_buttons, _back_button_for_ctx, _categories_markup, _more_markup,
     _show_list, _show_item_view, _show_collections, _show_categories_msg,
     _extract_list_context,
@@ -889,19 +889,28 @@ async def cmd_search(message: types.Message, db=None, query_override: str | None
         await wait_msg.edit_text(f"🔍 По запросу «{query}» ничего не найдено.")
         return
 
-    # Build clickable search results
-    text = f"{search_info}🔍 <b>Результаты ({len(items)}):</b>"
+    # Build text-based search results
+    result_lines = []
     buttons = []
-    for i, item in enumerate(items, 1):
-        title = _format_item_short(item)
-        buttons.append([InlineKeyboardButton(
-            text=f"{i}. {title}",
+    for i, item in enumerate(items[:10], 1):
+        result_lines.append(_format_item_list_entry(item, i))
+        buttons.append(InlineKeyboardButton(
+            text=str(i),
             callback_data=f"vi:r:0:{item['id']}",
-        )])
+        ))
+
+    shown = min(len(items), 10)
+    count_str = f"{shown} из {len(items)}" if len(items) > 10 else str(len(items))
+    text = f"{search_info}\U0001f50d <b>Результаты ({count_str}):</b>\n\n"
+    text += "\n\n".join(result_lines)
+
+    kb = []
+    if buttons:
+        kb.append(buttons)
 
     await wait_msg.edit_text(
         text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb) if kb else None,
         parse_mode="HTML",
     )
 
