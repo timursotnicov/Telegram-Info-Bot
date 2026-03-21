@@ -15,7 +15,7 @@ from savebot.handlers.browse_core import (
     PAGE_SIZE, _CTX_MAP, _CTX_REV, _CTX_TITLES, SORT_LABELS,
     _truncate_tag, _truncate_source, _format_item_short, _format_item_full,
     _format_item, _sort_buttons, _recent_sort_buttons, _clickable_list_buttons,
-    _back_button_for_ctx, _categories_markup, _more_markup,
+    _text_list_with_buttons, _back_button_for_ctx, _categories_markup, _more_markup,
     _show_list, _show_item_view, _show_collections, _show_categories_msg,
     _extract_list_context,
 )
@@ -921,14 +921,12 @@ async def cmd_recent(message: types.Message, db=None):
         await message.reply("Пока нет сохранённых записей.")
         return
 
-    all_items = await queries.get_items_page_with_nums(db, user_id, "recent", limit=10000, offset=0)
-    total = len(all_items)
-
-    buttons = _clickable_list_buttons(items, "r", "0", 0, total)
+    total = await queries.count_items_in_context(db, user_id, "recent")
+    items_text, buttons = _text_list_with_buttons(items, "r", "0", 0, total)
     buttons.append([_back_button_for_ctx("r")])
 
     await message.reply(
-        f"🕐 <b>Последние записи</b> ({total})",
+        f"\U0001f550 <b>Последние записи</b> ({total})\n\n{items_text}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
@@ -941,17 +939,15 @@ async def cmd_pinned(message: types.Message, db=None):
     user_id = message.from_user.id
     items = await queries.get_items_page_with_nums(db, user_id, "pinned", limit=PAGE_SIZE, offset=0)
     if not items:
-        await message.reply("📌 Нет закреплённых записей. Используйте /pin &lt;id&gt; чтобы закрепить.")
+        await message.reply("\U0001f4cc Нет закреплённых записей. Используйте /pin &lt;id&gt; чтобы закрепить.")
         return
 
-    all_items = await queries.get_items_page_with_nums(db, user_id, "pinned", limit=10000, offset=0)
-    total = len(all_items)
-
-    buttons = _clickable_list_buttons(items, "p", "0", 0, total)
+    total = await queries.count_items_in_context(db, user_id, "pinned")
+    items_text, buttons = _text_list_with_buttons(items, "p", "0", 0, total)
     buttons.append([_back_button_for_ctx("p")])
 
     await message.reply(
-        f"📌 <b>Закреплённые записи</b> ({total})",
+        f"\U0001f4cc <b>Закреплённые записи</b> ({total})\n\n{items_text}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )

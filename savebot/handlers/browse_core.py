@@ -98,6 +98,46 @@ def _format_item_short(item: dict) -> str:
     return title
 
 
+def _format_item_list_entry(item: dict, num: int) -> str:
+    """Format a single item for text-based list view.
+
+    Truncation: title <= 80 chars, meta <= 60 chars (Issue 2A).
+    """
+    if item.get("ai_summary"):
+        title = item["ai_summary"]
+    elif item.get("content_text"):
+        title = item["content_text"][:120]
+    else:
+        title = "(без текста)"
+    if len(title) > 80:
+        title = title[:77] + "..."
+    title = html.escape(title)
+
+    line = f"<b>{num}.</b> {title}"
+
+    # Meta line: category + source + date + tags (max 60 chars)
+    meta_parts = []
+    if item.get("category_emoji") and item.get("category_name"):
+        meta_parts.append(f"{item['category_emoji']} {html.escape(item['category_name'])}")
+    if item.get("source"):
+        meta_parts.append(f"\U0001f4e8 {html.escape(item['source'])}")
+    if item.get("created_at"):
+        date_str = str(item["created_at"])[:10]
+        meta_parts.append(date_str)
+
+    tags = item.get("tags", [])
+    if tags:
+        meta_parts.append(" ".join(f"#{t}" for t in tags[:3]))
+
+    if meta_parts:
+        meta = " \u00b7 ".join(meta_parts)
+        if len(meta) > 60:
+            meta = meta[:57] + "..."
+        line += f"\n   {meta}"
+
+    return line
+
+
 def _format_item_full(item: dict, position: int | None = None, total: int | None = None) -> str:
     """Full format for single item view."""
     parts = []
@@ -108,7 +148,7 @@ def _format_item_full(item: dict, position: int | None = None, total: int | None
         header = f"\U0001f4dd {position} / {total}  |  {header}"
     if item.get("category_name"):
         emoji = item.get("category_emoji", "\U0001f4c1")
-        header += f"  |  {emoji} {item['category_name']}"
+        header += f"  |  {emoji} {html.escape(item['category_name'])}"
     parts.append(header)
 
     # Content
@@ -164,7 +204,7 @@ def _clickable_list_buttons(
     deleting_item_id: int | None = None,
     sort_by: str = "d",
 ) -> list[list[InlineKeyboardButton]]:
-    """Build clickable item buttons + pagination for a list view."""
+    """Build clickable item buttons + pagination for a list view (legacy)."""
     buttons = []
     for item in items:
         if deleting_item_id and item["id"] == deleting_item_id:
@@ -209,6 +249,73 @@ def _clickable_list_buttons(
         buttons.append(nav)
 
     return buttons
+
+
+def _text_list_with_buttons(
+    items: list[dict],
+    ctx_short: str,
+    ctx_id: str | int,
+    offset: int,
+    total: int,
+    deleting_item_id: int | None = None,
+    sort_by: str = "d",
+) -> tuple[str, list[list[InlineKeyboardButton]]]:
+    """Build text + number buttons for a list view.
+
+    Returns (text_block, buttons) where text_block contains formatted items
+    and buttons are number keys + pagination.
+    """
+    text_lines = []
+    number_buttons = []
+    buttons = []
+
+    for i, item in enumerate(items):
+        display_i = i + 1
+
+        if deleting_item_id and item["id"] == deleting_item_id:
+            text_lines.append(f"<b>{display_i}.</b> <s>{_format_item_short(item)}</s>  \U0001f5d1 Удалить?")
+            number_buttons.append(InlineKeyboardButton(text="\U0001f5d1", callback_data="noop"))
+        else:
+            text_lines.append(_format_item_list_entry(item, display_i))
+            number_buttons.append(InlineKeyboardButton(
+                text=str(display_i),
+                callback_data=f"vi:{ctx_short}:{ctx_id}:{item['id']}",
+            ))
+
+    # Number buttons row (e.g. [1] [2] [🗑] [4] [5])
+    if number_buttons:
+        buttons.append(number_buttons)
+
+    # Confirm/cancel row for deleting item
+    if deleting_item_id:
+        for item in items:
+            if item["id"] == deleting_item_id:
+                buttons.append([
+                    InlineKeyboardButton(text="\u2705 Да", callback_data=f"vy:{ctx_short}:{ctx_id}:{item['id']}:{offset}"),
+                    InlineKeyboardButton(text="\u274c Нет", callback_data=f"vx:{ctx_short}:{ctx_id}:{offset}"),
+                ])
+                break
+
+    # Pagination row
+    page = offset // PAGE_SIZE + 1
+    total_pages = max(1, math.ceil(total / PAGE_SIZE))
+    nav = []
+    if offset > 0:
+        nav.append(InlineKeyboardButton(
+            text="\u2b05\ufe0f",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset - PAGE_SIZE}:{sort_by}",
+        ))
+    nav.append(InlineKeyboardButton(text=f"Стр. {page}/{total_pages}", callback_data="noop"))
+    if offset + PAGE_SIZE < total:
+        nav.append(InlineKeyboardButton(
+            text="\u27a1\ufe0f",
+            callback_data=f"vl:{ctx_short}:{ctx_id}:{offset + PAGE_SIZE}:{sort_by}",
+        ))
+    if nav:
+        buttons.append(nav)
+
+    text_block = "\n\n".join(text_lines)
+    return text_block, buttons
 
 
 def _back_button_for_ctx(ctx_short: str, ctx_id: str | int = "0") -> InlineKeyboardButton:
@@ -309,20 +416,20 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         cats = await queries.get_all_categories(db, user_id)
         cat_name = next((c["name"] for c in cats if c["id"] == int(ctx_id)), "")
         cat_emoji = next((c.get("emoji", "\U0001f4c1") for c in cats if c["id"] == int(ctx_id)), "\U0001f4c1")
-        title = f"{cat_emoji} <b>{cat_name}</b> ({total})"
+        title = f"{cat_emoji} <b>{html.escape(cat_name)}</b> ({total})"
     elif context_type == "tag":
-        title = f"\U0001f3f7 <b>#{ctx_id}</b> ({total})"
+        title = f"\U0001f3f7 <b>#{html.escape(str(ctx_id))}</b> ({total})"
     elif context_type == "collection":
         colls = await queries.get_collections(db, user_id)
         coll_name = next((c["name"] for c in colls if c["id"] == int(ctx_id)), "")
         coll_emoji = next((c.get("emoji", "\U0001f4c1") for c in colls if c["id"] == int(ctx_id)), "\U0001f4c1")
-        title = f"{coll_emoji} <b>{coll_name}</b> ({total})"
+        title = f"{coll_emoji} <b>{html.escape(coll_name)}</b> ({total})"
     elif context_type == "source":
         title = f"\U0001f4e8 <b>{html.escape(str(ctx_id))}</b> ({total})"
     else:
         title = f"{title} ({total})"
 
-    buttons = _clickable_list_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id, sort_by=sort_by)
+    items_text, buttons = _text_list_with_buttons(items, ctx_short, ctx_id, offset, total, deleting_item_id=deleting_item_id, sort_by=sort_by)
     if context_type == "category":
         buttons.insert(0, _sort_buttons(int(ctx_id), sort_by))
     elif context_type == "recent":
@@ -336,8 +443,10 @@ async def _show_list(callback: types.CallbackQuery, context_type: str, ctx_id: s
         ))
     buttons.append(footer)
 
+    full_text = f"{title}\n\n{items_text}"
+
     await callback.message.edit_text(
-        title,
+        full_text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="HTML",
     )
