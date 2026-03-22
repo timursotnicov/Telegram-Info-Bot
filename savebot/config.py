@@ -31,9 +31,9 @@ def _parse_allowed_users():
 config.allowed_users = _parse_allowed_users()
 config.ai_fallback_models = [
     config.ai_model,
-    "stepfun/step-3.5-flash:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "arcee-ai/trinity-large-preview:free",
+    "deepseek/deepseek-chat-v3-0324",
+    "deepseek/deepseek-chat",
+    "google/gemini-2.0-flash-001",
 ]
 
 def _validate_config():
