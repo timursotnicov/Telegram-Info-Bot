@@ -10,7 +10,7 @@ load_dotenv()
 class Config:
     bot_token: str = os.getenv("BOT_TOKEN", "")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    ai_model: str = os.getenv("AI_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+    ai_model: str = os.getenv("AI_MODEL", "nousresearch/hermes-3-llama-3.1-405b:free")
     ai_fallback_models: list = None  # Set in __post_init__ equivalent below
     db_path: str = os.getenv("DB_PATH", "savebot.db")
     webhook_host: str = os.getenv("WEBHOOK_HOST", "")
@@ -31,9 +31,9 @@ def _parse_allowed_users():
 config.allowed_users = _parse_allowed_users()
 config.ai_fallback_models = [
     config.ai_model,
-    "google/gemma-3-27b-it:free",
+    "stepfun/step-3.5-flash:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
     "arcee-ai/trinity-large-preview:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
 ]
 
 def _validate_config():
