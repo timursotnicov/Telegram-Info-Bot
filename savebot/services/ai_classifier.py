@@ -57,8 +57,10 @@ _CODE_BLOCK_RE = re.compile(r"^```\w*\n?", re.MULTILINE)
 _CODE_BLOCK_END_RE = re.compile(r"\n?```$")
 
 
-def _strip_code_blocks(text: str) -> str:
+def _strip_code_blocks(text: str | None) -> str:
     """Strip markdown code block fences from LLM response."""
+    if not text:
+        return ""
     text = text.strip()
     text = _CODE_BLOCK_RE.sub("", text, count=1)
     text = _CODE_BLOCK_END_RE.sub("", text, count=1)
@@ -129,6 +131,9 @@ async def classify_content(
                     data = await resp.json()
 
             text = data["choices"][0]["message"]["content"]
+            if not text:
+                logger.warning("Model %s returned empty content, trying next", model)
+                continue
             text = _strip_code_blocks(text)
 
             result = json.loads(text)

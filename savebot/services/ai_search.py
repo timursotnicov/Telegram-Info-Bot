@@ -101,6 +101,9 @@ async def _call_openrouter(system_prompt: str, user_prompt: str, temperature: fl
                     data = await resp.json()
 
             text = data["choices"][0]["message"]["content"]
+            if not text:
+                logger.warning("Model %s returned empty content, trying next", model)
+                continue
             return _strip_code_blocks(text)
         except asyncio.TimeoutError:
             logger.warning("OpenRouter timeout with model %s, trying next", model)
