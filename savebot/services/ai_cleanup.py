@@ -8,6 +8,26 @@ from savebot.services.ai_classifier import _strip_code_blocks
 
 logger = logging.getLogger(__name__)
 
+
+def _try_fix_truncated_json(text: str) -> list[dict] | None:
+    """Try to parse truncated JSON array by finding the last complete object."""
+    if not text or not text.strip().startswith("["):
+        return None
+    # Find the last complete object (ends with })
+    last_brace = text.rfind("}")
+    if last_brace == -1:
+        return None
+    candidate = text[:last_brace + 1].rstrip().rstrip(",") + "]"
+    try:
+        result = json.loads(candidate)
+        if isinstance(result, list) and len(result) > 0:
+            logger.info("AI cleanup: salvaged %d suggestions from truncated JSON", len(result))
+            return result
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return None
+
+
 CLEANUP_PROMPT = """\
 Analyze these categories and their sample items. Suggest a consolidation plan.
 
@@ -59,13 +79,20 @@ async def analyze_categories(db, user_id: int) -> list[dict] | None:
 
     user_prompt = "Categories and sample items:\n\n" + "\n\n".join(context_parts)
 
-    text = await _call_openrouter(CLEANUP_PROMPT, user_prompt, temperature=0.3, max_tokens=800)
+    text = await _call_openrouter(CLEANUP_PROMPT, user_prompt, temperature=0.3, max_tokens=2000)
     if not text:
         return None
 
     try:
         text = _strip_code_blocks(text)
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.error("AI cleanup parse error: %s", e)
+        result = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        # Try to salvage truncated JSON by closing open brackets
+        result = _try_fix_truncated_json(text)
+        if result is None:
+            logger.error("AI cleanup parse error: could not parse or fix response")
+            return None
+
+    if not isinstance(result, list):
         return None
+    return result
