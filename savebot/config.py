@@ -10,7 +10,7 @@ load_dotenv()
 class Config:
     bot_token: str = os.getenv("BOT_TOKEN", "")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    ai_model: str = os.getenv("AI_MODEL", "deepseek/deepseek-chat-v3-0324:free")
+    ai_model: str = os.getenv("AI_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
     ai_fallback_models: list = None  # Set in __post_init__ equivalent below
     db_path: str = os.getenv("DB_PATH", "savebot.db")
     webhook_host: str = os.getenv("WEBHOOK_HOST", "")
