@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 
 from aiogram import F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,6 +16,16 @@ logger = logging.getLogger(__name__)
 
 # In-memory storage for pending cleanup plans (user_id -> list of suggestions)
 _pending_plans: dict[int, list[dict]] = {}
+
+# Strip leading emojis from category names returned by AI
+_EMOJI_RE = re.compile(
+    r"^[\U0001f300-\U0001faff\u2600-\u27bf\ufe0f\u200d\u20e3\u2b50\u2705\u274c\u2764\u2934\u25aa-\u25fe\u2b1b\u2b1c\u23e9-\u23fa\u200b]+\s*",
+)
+
+
+def _clean_cat_name(name: str) -> str:
+    """Strip leading emojis and whitespace from AI-returned category names."""
+    return _EMOJI_RE.sub("", name).strip()
 
 
 @router.callback_query(F.data == "settings_cleanup")
@@ -120,24 +131,28 @@ async def on_cleanup_accept(callback: types.CallbackQuery, db=None):
 
     try:
         if action == "merge":
-            if s.get("category") in _default_names:
+            src_name = _clean_cat_name(s.get("category", ""))
+            tgt_name = _clean_cat_name(s.get("target", ""))
+            if src_name in _default_names:
                 await callback.answer("\u26a0\ufe0f Нельзя удалить базовую категорию")
                 await _show_next_suggestion(callback.message, user_id, index + 1)
                 return
-            source_cat = await queries.get_category_by_name(db, user_id, s["category"])
-            target_cat = await queries.get_category_by_name(db, user_id, s["target"])
+            source_cat = await queries.get_category_by_name(db, user_id, src_name)
+            target_cat = await queries.get_category_by_name(db, user_id, tgt_name)
             if source_cat and target_cat:
                 moved = await queries.merge_categories(db, user_id, source_cat["id"], target_cat["id"])
                 await callback.answer(f"\u2705 Перенесено {moved} записей")
             else:
+                logger.warning("Cleanup merge failed: source=%r target=%r", src_name, tgt_name)
                 await callback.answer("\u26a0\ufe0f Категория не найдена")
 
         elif action == "delete":
-            if s.get("category") in _default_names:
+            del_name = _clean_cat_name(s.get("category", ""))
+            if del_name in _default_names:
                 await callback.answer("\u26a0\ufe0f Нельзя удалить базовую категорию")
                 await _show_next_suggestion(callback.message, user_id, index + 1)
                 return
-            cat = await queries.get_category_by_name(db, user_id, s["category"])
+            cat = await queries.get_category_by_name(db, user_id, del_name)
             if cat:
                 await queries.delete_category(db, user_id, cat["id"])
                 await callback.answer("\u2705 Удалено")

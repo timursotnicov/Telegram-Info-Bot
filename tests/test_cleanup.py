@@ -1,6 +1,7 @@
 """Tests for AI category cleanup."""
 import pytest
 from savebot.services.ai_cleanup import CLEANUP_PROMPT, _try_fix_truncated_json
+from savebot.handlers.cleanup import _clean_cat_name
 
 
 class TestCleanupPrompt:
@@ -33,3 +34,20 @@ class TestTryFixTruncatedJson:
     def test_not_array_returns_none(self):
         """Non-array JSON should return None."""
         assert _try_fix_truncated_json('{"action": "keep"}') is None
+
+
+class TestCleanCatName:
+    def test_strips_emoji_prefix(self):
+        assert _clean_cat_name("💻 Технологии") == "Технологии"
+        assert _clean_cat_name("📥 Разное") == "Разное"
+        assert _clean_cat_name("🏋️ Здоровье") == "Здоровье"
+
+    def test_plain_name_unchanged(self):
+        assert _clean_cat_name("Технологии") == "Технологии"
+        assert _clean_cat_name("My Category") == "My Category"
+
+    def test_empty_string(self):
+        assert _clean_cat_name("") == ""
+
+    def test_multiple_emojis(self):
+        assert _clean_cat_name("💻🔬 Science") == "Science"
