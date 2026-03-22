@@ -1,7 +1,10 @@
-"""Tests for save flow helpers (_category_buttons, _post_save_keyboard)."""
+"""Tests for save flow helpers (_category_buttons, _post_save_keyboard, media group dedup)."""
 
 import pytest
-from savebot.handlers.save import _category_buttons, _post_save_keyboard
+from savebot.handlers.save import (
+    _category_buttons, _post_save_keyboard,
+    _is_duplicate_media_group, _seen_media_groups,
+)
 
 
 # ── _category_buttons ─────────────────────────────────────
@@ -56,3 +59,34 @@ class TestPostSaveKeyboard:
         assert any("Pin" in t for t in texts), "Post-save keyboard should have Pin button"
         # Should have Delete button
         assert any("Удалить" in t for t in texts), "Post-save keyboard should have Delete button"
+
+
+# ── Media group deduplication ─────────────────────────────
+
+
+class TestMediaGroupDedup:
+    def setup_method(self):
+        """Clear state between tests."""
+        _seen_media_groups.clear()
+
+    def test_none_media_group_id_not_duplicate(self):
+        """None media_group_id (regular message) should never be a duplicate."""
+        assert _is_duplicate_media_group(None) is False
+        assert _is_duplicate_media_group(None) is False
+
+    def test_first_message_in_group_passes(self):
+        """First message with a media_group_id should pass through."""
+        assert _is_duplicate_media_group("group_123") is False
+
+    def test_second_message_in_group_blocked(self):
+        """Second+ messages with the same media_group_id should be blocked."""
+        assert _is_duplicate_media_group("group_456") is False
+        assert _is_duplicate_media_group("group_456") is True
+        assert _is_duplicate_media_group("group_456") is True
+
+    def test_different_groups_independent(self):
+        """Different media_group_ids should be tracked independently."""
+        assert _is_duplicate_media_group("group_A") is False
+        assert _is_duplicate_media_group("group_B") is False
+        assert _is_duplicate_media_group("group_A") is True
+        assert _is_duplicate_media_group("group_B") is True

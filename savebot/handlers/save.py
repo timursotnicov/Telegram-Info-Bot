@@ -2,6 +2,7 @@
 from __future__ import annotations
 import html
 import logging
+import time
 
 from aiogram import F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,6 +16,27 @@ from savebot.services.ocr import extract_text_from_image
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+# ── Media group deduplication ──────────────────────────────
+# Telegram sends each photo/video in an album as a separate message
+# with the same media_group_id. We track seen IDs to process only the first.
+_seen_media_groups: dict[str, float] = {}
+_MEDIA_GROUP_TTL = 60  # seconds
+
+
+def _is_duplicate_media_group(media_group_id: str | None) -> bool:
+    """Return True if this media_group_id was already seen (skip it)."""
+    if not media_group_id:
+        return False
+    now = time.monotonic()
+    # Cleanup old entries
+    stale = [k for k, t in _seen_media_groups.items() if now - t > _MEDIA_GROUP_TTL]
+    for k in stale:
+        del _seen_media_groups[k]
+    if media_group_id in _seen_media_groups:
+        return True
+    _seen_media_groups[media_group_id] = now
+    return False
 
 
 def _category_buttons(
@@ -256,6 +278,10 @@ async def _manual_save_flow(message, db, user_id, ai_result,
 
 async def _process_content(message: types.Message, db):
     """Process incoming content — auto-save or manual mode."""
+    # Skip duplicate messages from media groups (albums)
+    if _is_duplicate_media_group(message.media_group_id):
+        return
+
     user_id = message.from_user.id
     await queries.ensure_default_categories(db, user_id)
 
