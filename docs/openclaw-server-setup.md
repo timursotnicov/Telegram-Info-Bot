@@ -116,6 +116,52 @@ openclaw doctor         # Health check
 openclaw status         # Channel health + recent sessions
 ```
 
+## Browser Setup
+
+Two browser engines are available for web browsing:
+
+| Engine | Port | Use Case | Cloudflare | Speed |
+|--------|------|----------|------------|-------|
+| Lightpanda | 9222 | Simple sites, docs, APIs | No | Fast |
+| Chromium | 9223 | JS-heavy, Cloudflare-protected | Yes | Slower |
+
+### Install Scripts
+
+```bash
+# Lightpanda (already installed)
+ssh root@178.104.30.181 "bash -s" < deploy/lightpanda-setup.sh
+
+# Chromium fallback
+ssh root@178.104.30.181 "bash -s" < deploy/chromium-fallback-setup.sh
+```
+
+### Browser Profiles in openclaw.json
+
+```json
+{
+  "browser": {
+    "enabled": true,
+    "defaultProfile": "lightpanda",
+    "profiles": {
+      "lightpanda": { "cdpUrl": "ws://127.0.0.1:9222" },
+      "chromium": { "cdpUrl": "ws://127.0.0.1:9223" }
+    }
+  }
+}
+```
+
+### Service Management
+
+```bash
+# Lightpanda
+systemctl status lightpanda
+journalctl -u lightpanda -f
+
+# Chromium
+systemctl status chromium-openclaw
+journalctl -u chromium-openclaw -f
+```
+
 ## Gotchas
 
 1. **Model config hierarchy**: Agent-level `models.json` overrides global `openclaw.json` defaults
