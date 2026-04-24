@@ -1,0 +1,173 @@
+{
+  "filepath": "C:\\Users\\Timmy\\Claude Projects\\Telegram-Info-Bot\\savebot\\handlers\\browse.py",
+  "dependencies": {
+    "_clickable_list_buttons": [
+      "_format_item_short"
+    ],
+    "_show_categories_msg": [
+      "_categories_markup"
+    ],
+    "cmd_browse": [
+      "_show_categories_msg"
+    ],
+    "on_hub": [
+      "_more_markup"
+    ],
+    "on_hub_cats": [
+      "_categories_markup"
+    ],
+    "on_category_latest": [
+      "_show_item_view"
+    ],
+    "on_category_sources": [
+      "_truncate_source"
+    ],
+    "on_hub_tags": [
+      "_truncate_tag"
+    ],
+    "on_hub_forgotten": [
+      "_show_list"
+    ],
+    "on_hub_sources": [
+      "_truncate_source"
+    ],
+    "on_browse_source": [
+      "_show_list"
+    ],
+    "on_hub_colls": [
+      "_show_collections"
+    ],
+    "cmd_collections": [
+      "_show_collections"
+    ],
+    "on_browse_collection": [
+      "_show_list"
+    ],
+    "_show_list": [
+      "_back_button_for_ctx",
+      "_clickable_list_buttons",
+      "_recent_sort_buttons",
+      "_sort_buttons"
+    ],
+    "on_browse_category": [
+      "_show_list"
+    ],
+    "on_tag_items": [
+      "_show_list"
+    ],
+    "on_tags_back": [
+      "on_hub_tags"
+    ],
+    "on_list_page": [
+      "_show_list"
+    ],
+    "on_list_delete": [
+      "_extract_list_context",
+      "_show_list"
+    ],
+    "on_list_delete_confirm": [
+      "_back_button_for_ctx",
+      "_extract_list_context",
+      "_show_list"
+    ],
+    "on_list_delete_cancel": [
+      "_extract_list_context",
+      "_show_list"
+    ],
+    "_show_item_view": [
+      "_format_item_full"
+    ],
+    "on_view_item": [
+      "_show_item_view"
+    ],
+    "on_nav_item": [
+      "_show_item_view"
+    ],
+    "on_action_pin": [
+      "_extract_list_context",
+      "_show_item_view"
+    ],
+    "on_action_delete": [
+      "_extract_list_context"
+    ],
+    "on_action_delete_confirm": [
+      "_back_button_for_ctx",
+      "_extract_list_context",
+      "_show_list"
+    ],
+    "on_action_delete_cancel": [
+      "_extract_list_context",
+      "_show_item_view"
+    ],
+    "on_action_move_confirm": [
+      "_show_item_view"
+    ],
+    "on_action_related": [
+      "_extract_list_context",
+      "_format_item_short"
+    ],
+    "on_action_add_to_coll_confirm": [
+      "_show_item_view"
+    ],
+    "cmd_tags": [
+      "_truncate_tag"
+    ],
+    "cmd_search": [
+      "_format_item_short"
+    ],
+    "cmd_recent": [
+      "_back_button_for_ctx",
+      "_clickable_list_buttons"
+    ],
+    "cmd_pinned": [
+      "_back_button_for_ctx",
+      "_clickable_list_buttons"
+    ],
+    "cmd_forgotten": [
+      "_back_button_for_ctx",
+      "_clickable_list_buttons"
+    ]
+  },
+  "shared_helpers": {
+    "_format_item_short": [
+      "commands",
+      "core",
+      "item"
+    ],
+    "_categories_markup": [
+      "core",
+      "list"
+    ],
+    "_show_item_view": [
+      "item",
+      "list",
+      "nav"
+    ],
+    "_truncate_tag": [
+      "commands",
+      "list"
+    ],
+    "_show_list": [
+      "item",
+      "list"
+    ],
+    "_show_collections": [
+      "commands",
+      "list"
+    ],
+    "_back_button_for_ctx": [
+      "commands",
+      "core",
+      "item",
+      "list"
+    ],
+    "_clickable_list_buttons": [
+      "commands",
+      "core"
+    ],
+    "_extract_list_context": [
+      "item",
+      "list"
+    ]
+  }
+}

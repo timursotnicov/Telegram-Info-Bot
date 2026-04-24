@@ -1,0 +1,472 @@
+{
+  "filepath": "C:\\Users\\Timmy\\Claude Projects\\Telegram-Info-Bot\\savebot\\handlers\\browse.py",
+  "total_lines": 1496,
+  "sections": {
+    "list": {
+      "function_count": 23,
+      "functions": [
+        {
+          "name": "_sort_buttons",
+          "line_start": 48,
+          "line_end": 57,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_recent_sort_buttons",
+          "line_start": 60,
+          "line_end": 71,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "on_hub",
+          "line_start": 275,
+          "line_end": 281,
+          "type": "callback_handler",
+          "callback_prefix": "bm:hub"
+        },
+        {
+          "name": "on_hub_cats",
+          "line_start": 287,
+          "line_end": 306,
+          "type": "callback_handler",
+          "callback_prefix": "bm:cats"
+        },
+        {
+          "name": "on_category_menu",
+          "line_start": 312,
+          "line_end": 338,
+          "type": "callback_handler",
+          "callback_prefix": "cm:"
+        },
+        {
+          "name": "on_category_latest",
+          "line_start": 342,
+          "line_end": 354,
+          "type": "callback_handler",
+          "callback_prefix": "cl:"
+        },
+        {
+          "name": "on_category_sources",
+          "line_start": 360,
+          "line_end": 390,
+          "type": "callback_handler",
+          "callback_prefix": "cs:"
+        },
+        {
+          "name": "on_hub_tags",
+          "line_start": 396,
+          "line_end": 423,
+          "type": "callback_handler",
+          "callback_prefix": "bm:tags"
+        },
+        {
+          "name": "on_hub_map",
+          "line_start": 429,
+          "line_end": 463,
+          "type": "callback_handler",
+          "callback_prefix": "bm:map"
+        },
+        {
+          "name": "on_hub_forgotten",
+          "line_start": 469,
+          "line_end": 470,
+          "type": "callback_handler",
+          "callback_prefix": "bm:forg"
+        },
+        {
+          "name": "on_hub_sources",
+          "line_start": 481,
+          "line_end": 524,
+          "type": "callback_handler",
+          "callback_prefix": "bm:sources"
+        },
+        {
+          "name": "on_browse_source",
+          "line_start": 528,
+          "line_end": 533,
+          "type": "callback_handler",
+          "callback_prefix": "src:"
+        },
+        {
+          "name": "on_hub_colls",
+          "line_start": 568,
+          "line_end": 569,
+          "type": "callback_handler",
+          "callback_prefix": "bm:colls"
+        },
+        {
+          "name": "on_browse_collection",
+          "line_start": 578,
+          "line_end": 583,
+          "type": "callback_handler",
+          "callback_prefix": "bc:"
+        },
+        {
+          "name": "on_hub_newcoll",
+          "line_start": 587,
+          "line_end": 594,
+          "type": "callback_handler",
+          "callback_prefix": "bm:newcoll"
+        },
+        {
+          "name": "on_hub_newcat",
+          "line_start": 600,
+          "line_end": 608,
+          "type": "callback_handler",
+          "callback_prefix": "bm:newcat"
+        },
+        {
+          "name": "on_browse_category",
+          "line_start": 676,
+          "line_end": 681,
+          "type": "callback_handler",
+          "callback_prefix": "browse_cat:"
+        },
+        {
+          "name": "on_tag_items",
+          "line_start": 685,
+          "line_end": 689,
+          "type": "callback_handler",
+          "callback_prefix": "tag_items:"
+        },
+        {
+          "name": "on_list_page",
+          "line_start": 701,
+          "line_end": 709,
+          "type": "callback_handler",
+          "callback_prefix": "vl:"
+        },
+        {
+          "name": "on_list_delete",
+          "line_start": 713,
+          "line_end": 724,
+          "type": "callback_handler",
+          "callback_prefix": "vd:"
+        },
+        {
+          "name": "on_list_delete_confirm",
+          "line_start": 728,
+          "line_end": 778,
+          "type": "callback_handler",
+          "callback_prefix": "vy:"
+        },
+        {
+          "name": "on_list_delete_cancel",
+          "line_start": 782,
+          "line_end": 792,
+          "type": "callback_handler",
+          "callback_prefix": "vx:"
+        },
+        {
+          "name": "on_noop",
+          "line_start": 796,
+          "line_end": 797,
+          "type": "callback_handler",
+          "callback_prefix": "noop"
+        }
+      ]
+    },
+    "item": {
+      "function_count": 14,
+      "functions": [
+        {
+          "name": "_truncate_tag",
+          "line_start": 76,
+          "line_end": 78,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "on_tags_back",
+          "line_start": 693,
+          "line_end": 695,
+          "type": "callback_handler",
+          "callback_prefix": "tags_back"
+        },
+        {
+          "name": "on_action_pin",
+          "line_start": 914,
+          "line_end": 935,
+          "type": "callback_handler",
+          "callback_prefix": "va:pin:"
+        },
+        {
+          "name": "on_action_delete",
+          "line_start": 952,
+          "line_end": 974,
+          "type": "callback_handler",
+          "callback_prefix": "va:del:"
+        },
+        {
+          "name": "on_action_delete_confirm",
+          "line_start": 978,
+          "line_end": 1030,
+          "type": "callback_handler",
+          "callback_prefix": "va:dyes:"
+        },
+        {
+          "name": "on_action_delete_cancel",
+          "line_start": 1034,
+          "line_end": 1049,
+          "type": "callback_handler",
+          "callback_prefix": "va:dno:"
+        },
+        {
+          "name": "on_action_move",
+          "line_start": 1053,
+          "line_end": 1076,
+          "type": "callback_handler",
+          "callback_prefix": "va:move:"
+        },
+        {
+          "name": "on_action_move_confirm",
+          "line_start": 1080,
+          "line_end": 1092,
+          "type": "callback_handler",
+          "callback_prefix": "va:mc:"
+        },
+        {
+          "name": "on_action_tags",
+          "line_start": 1096,
+          "line_end": 1114,
+          "type": "callback_handler",
+          "callback_prefix": "va:tags:"
+        },
+        {
+          "name": "on_action_note",
+          "line_start": 1118,
+          "line_end": 1135,
+          "type": "callback_handler",
+          "callback_prefix": "va:note:"
+        },
+        {
+          "name": "on_action_related",
+          "line_start": 1139,
+          "line_end": 1184,
+          "type": "callback_handler",
+          "callback_prefix": "va:rel:"
+        },
+        {
+          "name": "on_action_add_to_collection",
+          "line_start": 1188,
+          "line_end": 1209,
+          "type": "callback_handler",
+          "callback_prefix": "va:coll:"
+        },
+        {
+          "name": "on_action_add_to_coll_confirm",
+          "line_start": 1213,
+          "line_end": 1227,
+          "type": "callback_handler",
+          "callback_prefix": "va:ac:"
+        },
+        {
+          "name": "on_action_new_collection_for_item",
+          "line_start": 1231,
+          "line_end": 1240,
+          "type": "callback_handler",
+          "callback_prefix": "va:nc:"
+        }
+      ]
+    },
+    "core": {
+      "function_count": 12,
+      "functions": [
+        {
+          "name": "_format_item_short",
+          "line_start": 81,
+          "line_end": 91,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_format_item_full",
+          "line_start": 94,
+          "line_end": 133,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_format_item",
+          "line_start": 136,
+          "line_end": 148,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_clickable_list_buttons",
+          "line_start": 151,
+          "line_end": 204,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_back_button_for_ctx",
+          "line_start": 207,
+          "line_end": 218,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_more_markup",
+          "line_start": 223,
+          "line_end": 230,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_categories_markup",
+          "line_start": 233,
+          "line_end": 246,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_show_categories_msg",
+          "line_start": 249,
+          "line_end": 266,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_truncate_source",
+          "line_start": 475,
+          "line_end": 477,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_show_collections",
+          "line_start": 538,
+          "line_end": 564,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_show_list",
+          "line_start": 613,
+          "line_end": 672,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "_extract_list_context",
+          "line_start": 938,
+          "line_end": 948,
+          "type": "helper",
+          "callback_prefix": null
+        }
+      ]
+    },
+    "commands": {
+      "function_count": 11,
+      "functions": [
+        {
+          "name": "cmd_browse",
+          "line_start": 270,
+          "line_end": 271,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_collections",
+          "line_start": 573,
+          "line_end": 574,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_tags",
+          "line_start": 1246,
+          "line_end": 1271,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_search",
+          "line_start": 1277,
+          "line_end": 1345,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_ask",
+          "line_start": 1349,
+          "line_end": 1350,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_recent",
+          "line_start": 1356,
+          "line_end": 1373,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_pinned",
+          "line_start": 1379,
+          "line_end": 1396,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_pin",
+          "line_start": 1400,
+          "line_end": 1415,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_unpin",
+          "line_start": 1419,
+          "line_end": 1434,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_map",
+          "line_start": 1440,
+          "line_end": 1472,
+          "type": "command_handler",
+          "callback_prefix": null
+        },
+        {
+          "name": "cmd_forgotten",
+          "line_start": 1478,
+          "line_end": 1496,
+          "type": "command_handler",
+          "callback_prefix": null
+        }
+      ]
+    },
+    "nav": {
+      "function_count": 3,
+      "functions": [
+        {
+          "name": "_show_item_view",
+          "line_start": 802,
+          "line_end": 888,
+          "type": "helper",
+          "callback_prefix": null
+        },
+        {
+          "name": "on_view_item",
+          "line_start": 892,
+          "line_end": 898,
+          "type": "callback_handler",
+          "callback_prefix": "vi:"
+        },
+        {
+          "name": "on_nav_item",
+          "line_start": 902,
+          "line_end": 908,
+          "type": "callback_handler",
+          "callback_prefix": "vn:"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,732 @@
+{
+  "nodes": [
+    {
+      "id": "/browse",
+      "handler": "browse.py:30",
+      "func": "cmd_browse",
+      "type": "command"
+    },
+    {
+      "id": "bm:hub",
+      "handler": "browse.py:35",
+      "func": "on_hub",
+      "type": "callback"
+    },
+    {
+      "id": "bm:cats",
+      "handler": "browse.py:47",
+      "func": "on_hub_cats",
+      "type": "callback"
+    },
+    {
+      "id": "cm:",
+      "handler": "browse.py:72",
+      "func": "on_category_menu",
+      "type": "callback"
+    },
+    {
+      "id": "cl:",
+      "handler": "browse.py:102",
+      "func": "on_category_latest",
+      "type": "callback"
+    },
+    {
+      "id": "cs:",
+      "handler": "browse.py:120",
+      "func": "on_category_sources",
+      "type": "callback"
+    },
+    {
+      "id": "bm:tags",
+      "handler": "browse.py:156",
+      "func": "on_hub_tags",
+      "type": "callback"
+    },
+    {
+      "id": "bm:map",
+      "handler": "browse.py:189",
+      "func": "on_hub_map",
+      "type": "callback"
+    },
+    {
+      "id": "bm:forg",
+      "handler": "browse.py:229",
+      "func": "on_hub_forgotten",
+      "type": "callback"
+    },
+    {
+      "id": "bm:sources",
+      "handler": "browse.py:236",
+      "func": "on_hub_sources",
+      "type": "callback"
+    },
+    {
+      "id": "src:",
+      "handler": "browse.py:283",
+      "func": "on_browse_source",
+      "type": "callback"
+    },
+    {
+      "id": "bm:colls",
+      "handler": "browse.py:296",
+      "func": "on_hub_colls",
+      "type": "callback"
+    },
+    {
+      "id": "/collections",
+      "handler": "browse.py:301",
+      "func": "cmd_collections",
+      "type": "command"
+    },
+    {
+      "id": "bc:",
+      "handler": "browse.py:306",
+      "func": "on_browse_collection",
+      "type": "callback"
+    },
+    {
+      "id": "bm:newcoll",
+      "handler": "browse.py:315",
+      "func": "on_hub_newcoll",
+      "type": "callback"
+    },
+    {
+      "id": "bm:newcat",
+      "handler": "browse.py:328",
+      "func": "on_hub_newcat",
+      "type": "callback"
+    },
+    {
+      "id": "browse_cat:",
+      "handler": "browse.py:342",
+      "func": "on_browse_category",
+      "type": "callback"
+    },
+    {
+      "id": "tag_items:",
+      "handler": "browse.py:351",
+      "func": "on_tag_items",
+      "type": "callback"
+    },
+    {
+      "id": "tags_back",
+      "handler": "browse.py:359",
+      "func": "on_tags_back",
+      "type": "callback"
+    },
+    {
+      "id": "vl:",
+      "handler": "browse.py:367",
+      "func": "on_list_page",
+      "type": "callback"
+    },
+    {
+      "id": "vd:",
+      "handler": "browse.py:379",
+      "func": "on_list_delete",
+      "type": "callback"
+    },
+    {
+      "id": "vy:",
+      "handler": "browse.py:394",
+      "func": "on_list_delete_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "vx:",
+      "handler": "browse.py:448",
+      "func": "on_list_delete_cancel",
+      "type": "callback"
+    },
+    {
+      "id": "noop",
+      "handler": "browse.py:462",
+      "func": "on_noop",
+      "type": "callback"
+    },
+    {
+      "id": "vi:",
+      "handler": "browse.py:469",
+      "func": "on_view_item",
+      "type": "callback"
+    },
+    {
+      "id": "vn:",
+      "handler": "browse.py:479",
+      "func": "on_nav_item",
+      "type": "callback"
+    },
+    {
+      "id": "va:pin:",
+      "handler": "browse.py:491",
+      "func": "on_action_pin",
+      "type": "callback"
+    },
+    {
+      "id": "va:del:",
+      "handler": "browse.py:516",
+      "func": "on_action_delete",
+      "type": "callback"
+    },
+    {
+      "id": "va:dyes:",
+      "handler": "browse.py:542",
+      "func": "on_action_delete_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "va:dno:",
+      "handler": "browse.py:598",
+      "func": "on_action_delete_cancel",
+      "type": "callback"
+    },
+    {
+      "id": "va:move:",
+      "handler": "browse.py:617",
+      "func": "on_action_move",
+      "type": "callback"
+    },
+    {
+      "id": "va:mc:",
+      "handler": "browse.py:644",
+      "func": "on_action_move_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "va:tags:",
+      "handler": "browse.py:660",
+      "func": "on_action_tags",
+      "type": "callback"
+    },
+    {
+      "id": "va:note:",
+      "handler": "browse.py:682",
+      "func": "on_action_note",
+      "type": "callback"
+    },
+    {
+      "id": "va:rel:",
+      "handler": "browse.py:703",
+      "func": "on_action_related",
+      "type": "callback"
+    },
+    {
+      "id": "va:coll:",
+      "handler": "browse.py:752",
+      "func": "on_action_add_to_collection",
+      "type": "callback"
+    },
+    {
+      "id": "va:ac:",
+      "handler": "browse.py:777",
+      "func": "on_action_add_to_coll_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "va:nc:",
+      "handler": "browse.py:795",
+      "func": "on_action_new_collection_for_item",
+      "type": "callback"
+    },
+    {
+      "id": "/tags",
+      "handler": "browse.py:810",
+      "func": "cmd_tags",
+      "type": "command"
+    },
+    {
+      "id": "/search",
+      "handler": "browse.py:841",
+      "func": "cmd_search",
+      "type": "command"
+    },
+    {
+      "id": "/ask",
+      "handler": "browse.py:913",
+      "func": "cmd_ask",
+      "type": "command"
+    },
+    {
+      "id": "/recent",
+      "handler": "browse.py:920",
+      "func": "cmd_recent",
+      "type": "command"
+    },
+    {
+      "id": "/pinned",
+      "handler": "browse.py:943",
+      "func": "cmd_pinned",
+      "type": "command"
+    },
+    {
+      "id": "/pin",
+      "handler": "browse.py:964",
+      "func": "cmd_pin",
+      "type": "command"
+    },
+    {
+      "id": "/unpin",
+      "handler": "browse.py:983",
+      "func": "cmd_unpin",
+      "type": "command"
+    },
+    {
+      "id": "/map",
+      "handler": "browse.py:1004",
+      "func": "cmd_map",
+      "type": "command"
+    },
+    {
+      "id": "/forgotten",
+      "handler": "browse.py:1042",
+      "func": "cmd_forgotten",
+      "type": "command"
+    },
+    {
+      "id": "/start",
+      "handler": "manage.py:50",
+      "func": "cmd_start",
+      "type": "command"
+    },
+    {
+      "id": "/help",
+      "handler": "manage.py:69",
+      "func": "cmd_help",
+      "type": "command"
+    },
+    {
+      "id": "/clear",
+      "handler": "manage.py:88",
+      "func": "cmd_clear",
+      "type": "command"
+    },
+    {
+      "id": "/stats",
+      "handler": "manage.py:111",
+      "func": "cmd_stats",
+      "type": "command"
+    },
+    {
+      "id": "/categories",
+      "handler": "manage.py:126",
+      "func": "cmd_categories",
+      "type": "command"
+    },
+    {
+      "id": "cat_delete:",
+      "handler": "manage.py:159",
+      "func": "on_cat_delete",
+      "type": "callback"
+    },
+    {
+      "id": "cat_rename:",
+      "handler": "manage.py:171",
+      "func": "on_cat_rename",
+      "type": "callback"
+    },
+    {
+      "id": "cat_info:",
+      "handler": "manage.py:181",
+      "func": "on_cat_info",
+      "type": "callback"
+    },
+    {
+      "id": "cat_back",
+      "handler": "manage.py:215",
+      "func": "on_cat_back",
+      "type": "callback"
+    },
+    {
+      "id": "cat_add",
+      "handler": "manage.py:244",
+      "func": "on_cat_add",
+      "type": "callback"
+    },
+    {
+      "id": "/edit",
+      "handler": "manage.py:254",
+      "func": "cmd_edit",
+      "type": "command"
+    },
+    {
+      "id": "edit_cat:",
+      "handler": "manage.py:303",
+      "func": "on_edit_category",
+      "type": "callback"
+    },
+    {
+      "id": "/delete",
+      "handler": "manage.py:320",
+      "func": "cmd_delete",
+      "type": "command"
+    },
+    {
+      "id": "dpick:",
+      "handler": "manage.py:376",
+      "func": "on_delete_pick",
+      "type": "callback"
+    },
+    {
+      "id": "dconf:",
+      "handler": "manage.py:391",
+      "func": "on_delete_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "dcancel",
+      "handler": "manage.py:397",
+      "func": "on_delete_cancel",
+      "type": "callback"
+    },
+    {
+      "id": "/export",
+      "handler": "manage.py:405",
+      "func": "cmd_export",
+      "type": "command"
+    },
+    {
+      "id": "__keyboard_buttons__",
+      "handler": "menu.py:154",
+      "func": "handle_keyboard_button",
+      "type": "keyboard_button"
+    },
+    {
+      "id": "autosave_change:",
+      "handler": "save.py:330",
+      "func": "on_autosave_change",
+      "type": "callback"
+    },
+    {
+      "id": "autosave_pick:",
+      "handler": "save.py:344",
+      "func": "on_autosave_pick",
+      "type": "callback"
+    },
+    {
+      "id": "autosave_pin:",
+      "handler": "save.py:362",
+      "func": "on_autosave_pin",
+      "type": "callback"
+    },
+    {
+      "id": "autosave_delete:",
+      "handler": "save.py:370",
+      "func": "on_autosave_delete",
+      "type": "callback"
+    },
+    {
+      "id": "save_confirm:",
+      "handler": "save.py:381",
+      "func": "on_save_confirm",
+      "type": "callback"
+    },
+    {
+      "id": "save_change_cat:",
+      "handler": "save.py:418",
+      "func": "on_change_category",
+      "type": "callback"
+    },
+    {
+      "id": "save_pick_cat:",
+      "handler": "save.py:446",
+      "func": "on_pick_category",
+      "type": "callback"
+    },
+    {
+      "id": "save_new_cat:",
+      "handler": "save.py:483",
+      "func": "on_new_category",
+      "type": "callback"
+    },
+    {
+      "id": "save_cancel:",
+      "handler": "save.py:499",
+      "func": "on_save_cancel",
+      "type": "callback"
+    },
+    {
+      "id": "/settings",
+      "handler": "settings.py:50",
+      "func": "cmd_settings",
+      "type": "command"
+    },
+    {
+      "id": "settings_toggle:",
+      "handler": "settings.py:57",
+      "func": "on_settings_toggle",
+      "type": "callback"
+    },
+    {
+      "id": "settings_day",
+      "handler": "settings.py:71",
+      "func": "on_settings_day",
+      "type": "callback"
+    },
+    {
+      "id": "settings_set_day:",
+      "handler": "settings.py:92",
+      "func": "on_set_day",
+      "type": "callback"
+    },
+    {
+      "id": "settings_brief_time",
+      "handler": "settings.py:101",
+      "func": "on_settings_brief_time",
+      "type": "callback"
+    },
+    {
+      "id": "settings_brief_time:",
+      "handler": "settings.py:122",
+      "func": "on_set_brief_time",
+      "type": "callback"
+    },
+    {
+      "id": "settings_back",
+      "handler": "settings.py:131",
+      "func": "on_settings_back",
+      "type": "callback"
+    }
+  ],
+  "edges": [
+    {
+      "from": "bm:cats",
+      "to": "bm:hub",
+      "callback_data": "bm:hub"
+    },
+    {
+      "from": "cm:",
+      "to": "browse_cat:",
+      "callback_data": "browse_cat:"
+    },
+    {
+      "from": "cm:",
+      "to": "cs:",
+      "callback_data": "cs:"
+    },
+    {
+      "from": "cm:",
+      "to": "cl:",
+      "callback_data": "cl:"
+    },
+    {
+      "from": "cm:",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "cs:",
+      "to": "src:",
+      "callback_data": "src:"
+    },
+    {
+      "from": "cs:",
+      "to": "cm:",
+      "callback_data": "cm:"
+    },
+    {
+      "from": "bm:tags",
+      "to": "tag_items:",
+      "callback_data": "tag_items:"
+    },
+    {
+      "from": "bm:tags",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "bm:map",
+      "to": "browse_cat:",
+      "callback_data": "browse_cat:"
+    },
+    {
+      "from": "bm:map",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "bm:sources",
+      "to": "src:",
+      "callback_data": "src:"
+    },
+    {
+      "from": "bm:sources",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "va:del:",
+      "to": "va:dyes:",
+      "callback_data": "va:dyes:"
+    },
+    {
+      "from": "va:del:",
+      "to": "va:dno:",
+      "callback_data": "va:dno:"
+    },
+    {
+      "from": "va:del:",
+      "to": "vl:",
+      "callback_data": "vl:"
+    },
+    {
+      "from": "va:dyes:",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "va:dno:",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "va:move:",
+      "to": "va:mc:",
+      "callback_data": "va:mc:"
+    },
+    {
+      "from": "va:move:",
+      "to": "bm:cats",
+      "callback_data": "bm:cats"
+    },
+    {
+      "from": "va:rel:",
+      "to": "vi:",
+      "callback_data": "vi:"
+    },
+    {
+      "from": "va:coll:",
+      "to": "va:ac:",
+      "callback_data": "va:ac:"
+    },
+    {
+      "from": "va:coll:",
+      "to": "va:nc:",
+      "callback_data": "va:nc:"
+    },
+    {
+      "from": "va:coll:",
+      "to": "vi:",
+      "callback_data": "vi:r:0:"
+    },
+    {
+      "from": "/tags",
+      "to": "tag_items:",
+      "callback_data": "tag_items:"
+    },
+    {
+      "from": "/search",
+      "to": "vi:",
+      "callback_data": "vi:r:0:"
+    },
+    {
+      "from": "/map",
+      "to": "browse_cat:",
+      "callback_data": "browse_cat:"
+    },
+    {
+      "from": "/categories",
+      "to": "cat_info:",
+      "callback_data": "cat_info:"
+    },
+    {
+      "from": "/categories",
+      "to": "cat_rename:",
+      "callback_data": "cat_rename:"
+    },
+    {
+      "from": "/categories",
+      "to": "cat_delete:",
+      "callback_data": "cat_delete:"
+    },
+    {
+      "from": "cat_info:",
+      "to": "cat_rename:",
+      "callback_data": "cat_rename:"
+    },
+    {
+      "from": "cat_info:",
+      "to": "cat_delete:",
+      "callback_data": "cat_delete:"
+    },
+    {
+      "from": "cat_info:",
+      "to": "cat_back",
+      "callback_data": "cat_back"
+    },
+    {
+      "from": "cat_back",
+      "to": "cat_info:",
+      "callback_data": "cat_info:"
+    },
+    {
+      "from": "cat_back",
+      "to": "cat_rename:",
+      "callback_data": "cat_rename:"
+    },
+    {
+      "from": "cat_back",
+      "to": "cat_delete:",
+      "callback_data": "cat_delete:"
+    },
+    {
+      "from": "/edit",
+      "to": "edit_cat:",
+      "callback_data": "edit_cat:"
+    },
+    {
+      "from": "/delete",
+      "to": "dconf:",
+      "callback_data": "dconf:"
+    },
+    {
+      "from": "/delete",
+      "to": "dcancel",
+      "callback_data": "dcancel"
+    },
+    {
+      "from": "/delete",
+      "to": "dpick:",
+      "callback_data": "dpick:"
+    },
+    {
+      "from": "dpick:",
+      "to": "dconf:",
+      "callback_data": "dconf:"
+    },
+    {
+      "from": "dpick:",
+      "to": "dcancel",
+      "callback_data": "dcancel"
+    },
+    {
+      "from": "save_change_cat:",
+      "to": "save_pick_cat:",
+      "callback_data": "save_pick_cat:"
+    },
+    {
+      "from": "save_change_cat:",
+      "to": "save_new_cat:",
+      "callback_data": "save_new_cat:"
+    },
+    {
+      "from": "settings_day",
+      "to": "settings_set_day:",
+      "callback_data": "settings_set_day:"
+    },
+    {
+      "from": "settings_day",
+      "to": "settings_back",
+      "callback_data": "settings_back"
+    },
+    {
+      "from": "settings_brief_time",
+      "to": "settings_brief_time:",
+      "callback_data": "settings_brief_time:"
+    },
+    {
+      "from": "settings_brief_time",
+      "to": "settings_back",
+      "callback_data": "settings_back"
+    }
+  ]
+}

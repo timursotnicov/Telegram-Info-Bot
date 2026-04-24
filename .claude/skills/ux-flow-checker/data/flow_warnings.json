@@ -1,0 +1,554 @@
+[
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bm:hub",
+    "handler": "browse.py:35",
+    "description": "Handler 'bm:hub' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "cl:",
+    "handler": "browse.py:102",
+    "description": "Handler 'cl:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bm:forg",
+    "handler": "browse.py:229",
+    "description": "Handler 'bm:forg' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "src:",
+    "handler": "browse.py:283",
+    "description": "Handler 'src:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bm:colls",
+    "handler": "browse.py:296",
+    "description": "Handler 'bm:colls' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bc:",
+    "handler": "browse.py:306",
+    "description": "Handler 'bc:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bm:newcoll",
+    "handler": "browse.py:315",
+    "description": "Handler 'bm:newcoll' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "bm:newcat",
+    "handler": "browse.py:328",
+    "description": "Handler 'bm:newcat' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "browse_cat:",
+    "handler": "browse.py:342",
+    "description": "Handler 'browse_cat:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "tag_items:",
+    "handler": "browse.py:351",
+    "description": "Handler 'tag_items:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "tags_back",
+    "handler": "browse.py:359",
+    "description": "Handler 'tags_back' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vl:",
+    "handler": "browse.py:367",
+    "description": "Handler 'vl:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vd:",
+    "handler": "browse.py:379",
+    "description": "Handler 'vd:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vy:",
+    "handler": "browse.py:394",
+    "description": "Handler 'vy:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vx:",
+    "handler": "browse.py:448",
+    "description": "Handler 'vx:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vi:",
+    "handler": "browse.py:469",
+    "description": "Handler 'vi:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "vn:",
+    "handler": "browse.py:479",
+    "description": "Handler 'vn:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "va:tags:",
+    "handler": "browse.py:660",
+    "description": "Handler 'va:tags:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "va:note:",
+    "handler": "browse.py:682",
+    "description": "Handler 'va:note:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "cat_delete:",
+    "handler": "manage.py:159",
+    "description": "Handler 'cat_delete:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "cat_rename:",
+    "handler": "manage.py:171",
+    "description": "Handler 'cat_rename:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "cat_add",
+    "handler": "manage.py:244",
+    "description": "Handler 'cat_add' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "edit_cat:",
+    "handler": "manage.py:303",
+    "description": "Handler 'edit_cat:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "dconf:",
+    "handler": "manage.py:391",
+    "description": "Handler 'dconf:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "dcancel",
+    "handler": "manage.py:397",
+    "description": "Handler 'dcancel' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "autosave_change:",
+    "handler": "save.py:330",
+    "description": "Handler 'autosave_change:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "autosave_pick:",
+    "handler": "save.py:344",
+    "description": "Handler 'autosave_pick:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "autosave_pin:",
+    "handler": "save.py:362",
+    "description": "Handler 'autosave_pin:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "autosave_delete:",
+    "handler": "save.py:370",
+    "description": "Handler 'autosave_delete:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "save_confirm:",
+    "handler": "save.py:381",
+    "description": "Handler 'save_confirm:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "save_pick_cat:",
+    "handler": "save.py:446",
+    "description": "Handler 'save_pick_cat:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "save_new_cat:",
+    "handler": "save.py:483",
+    "description": "Handler 'save_new_cat:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "save_cancel:",
+    "handler": "save.py:499",
+    "description": "Handler 'save_cancel:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "settings_toggle:",
+    "handler": "settings.py:57",
+    "description": "Handler 'settings_toggle:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "settings_set_day:",
+    "handler": "settings.py:92",
+    "description": "Handler 'settings_set_day:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "settings_brief_time:",
+    "handler": "settings.py:122",
+    "description": "Handler 'settings_brief_time:' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "HIGH",
+    "type": "dead_end",
+    "node": "settings_back",
+    "handler": "settings.py:131",
+    "description": "Handler 'settings_back' has no outgoing navigation (no buttons lead elsewhere)",
+    "suggestion": "Add a back button or navigation link"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:tags",
+    "handler": "browse.py:156",
+    "description": "Handler 'bm:tags' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:map",
+    "handler": "browse.py:189",
+    "description": "Handler 'bm:map' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:forg",
+    "handler": "browse.py:229",
+    "description": "Handler 'bm:forg' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:sources",
+    "handler": "browse.py:236",
+    "description": "Handler 'bm:sources' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:colls",
+    "handler": "browse.py:296",
+    "description": "Handler 'bm:colls' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bc:",
+    "handler": "browse.py:306",
+    "description": "Handler 'bc:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:newcoll",
+    "handler": "browse.py:315",
+    "description": "Handler 'bm:newcoll' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "bm:newcat",
+    "handler": "browse.py:328",
+    "description": "Handler 'bm:newcat' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "tags_back",
+    "handler": "browse.py:359",
+    "description": "Handler 'tags_back' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "vd:",
+    "handler": "browse.py:379",
+    "description": "Handler 'vd:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "vy:",
+    "handler": "browse.py:394",
+    "description": "Handler 'vy:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "vx:",
+    "handler": "browse.py:448",
+    "description": "Handler 'vx:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "noop",
+    "handler": "browse.py:462",
+    "description": "Handler 'noop' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "vn:",
+    "handler": "browse.py:479",
+    "description": "Handler 'vn:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:pin:",
+    "handler": "browse.py:491",
+    "description": "Handler 'va:pin:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:del:",
+    "handler": "browse.py:516",
+    "description": "Handler 'va:del:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:move:",
+    "handler": "browse.py:617",
+    "description": "Handler 'va:move:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:tags:",
+    "handler": "browse.py:660",
+    "description": "Handler 'va:tags:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:note:",
+    "handler": "browse.py:682",
+    "description": "Handler 'va:note:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:rel:",
+    "handler": "browse.py:703",
+    "description": "Handler 'va:rel:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "va:coll:",
+    "handler": "browse.py:752",
+    "description": "Handler 'va:coll:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "cat_add",
+    "handler": "manage.py:244",
+    "description": "Handler 'cat_add' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "autosave_change:",
+    "handler": "save.py:330",
+    "description": "Handler 'autosave_change:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "autosave_pick:",
+    "handler": "save.py:344",
+    "description": "Handler 'autosave_pick:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "autosave_pin:",
+    "handler": "save.py:362",
+    "description": "Handler 'autosave_pin:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "autosave_delete:",
+    "handler": "save.py:370",
+    "description": "Handler 'autosave_delete:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "save_confirm:",
+    "handler": "save.py:381",
+    "description": "Handler 'save_confirm:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "save_change_cat:",
+    "handler": "save.py:418",
+    "description": "Handler 'save_change_cat:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "save_cancel:",
+    "handler": "save.py:499",
+    "description": "Handler 'save_cancel:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "settings_toggle:",
+    "handler": "settings.py:57",
+    "description": "Handler 'settings_toggle:' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "settings_day",
+    "handler": "settings.py:71",
+    "description": "Handler 'settings_day' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  },
+  {
+    "severity": "LOW",
+    "type": "orphan",
+    "node": "settings_brief_time",
+    "handler": "settings.py:101",
+    "description": "Handler 'settings_brief_time' has no incoming edges — unreachable from any button",
+    "suggestion": "Add a button that leads here, or remove the handler"
+  }
+]
