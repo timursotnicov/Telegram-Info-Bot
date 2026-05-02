@@ -1,0 +1,15 @@
+services:
+  savebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: savebot
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      APP_ENV: prod
+      DB_PATH: /data/savebot.db
+      USE_POLLING: "true"
+    volumes:
+      - ./data:/data

@@ -1,13 +1,32 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def _load_environment() -> None:
+    """Load environment-specific dotenv files without overriding real env vars."""
+    app_env = os.getenv("APP_ENV", "dev").strip().lower() or "dev"
+    explicit_env_file = os.getenv("ENV_FILE")
+
+    candidates = []
+    if explicit_env_file:
+        candidates.append(Path(explicit_env_file))
+    candidates.append(Path(f".env.{app_env}"))
+    candidates.append(Path(".env"))
+
+    for env_path in candidates:
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+
+_load_environment()
 
 
 @dataclass
 class Config:
+    app_env: str = os.getenv("APP_ENV", "dev")
     bot_token: str = os.getenv("BOT_TOKEN", "")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
     ai_model: str = os.getenv("AI_MODEL", "nousresearch/hermes-3-llama-3.1-405b:free")

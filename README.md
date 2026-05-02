@@ -30,8 +30,8 @@ Personal knowledge base Telegram bot (@My_Saves_AI_Bot). Send any text, link, or
 git clone https://github.com/timursotnicov/Telegram-Info-Bot.git
 cd Telegram-Info-Bot
 
-# Create .env file
-cp .env.example .env
+# Create dev env file
+cp .env.example .env.dev
 # Fill in: BOT_TOKEN, OPENROUTER_API_KEY
 
 # Install dependencies
@@ -84,10 +84,19 @@ deploy/              — Server setup script
 ## Deploy
 
 ```bash
-bash deploy/setup.sh
+cp .env.prod.example .env.prod
+# Fill in production secrets, then on the server:
+./deploy.sh
 ```
 
-Deploys to an Oracle Cloud VM with systemd service and daily SQLite backups.
+Deploys to an Oracle Cloud VM in Docker Compose production mode, enables SSH-only
+firewall rules, fail2ban, and SQLite backups before container restart.
+
+### Restore from Telegram Export
+
+```bash
+python scripts/import_telegram_export.py "C:\Users\Timmy\Downloads\Telegram Desktop\ChatExport_2026-05-02" --seed-db savebot_backup_2026-03-22.db --db savebot.db
+```
 
 ## Testing
 

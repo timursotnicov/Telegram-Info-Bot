@@ -1,9 +1,18 @@
 __pycache__/
 *.py[cod]
 *.db
+*.db-*
+*.db.*
 .env
+.env.*
+!.env.example
+!.env.prod.example
+.ssh_known_hosts*
 venv/
 .venv/
+.tmp/
+data/
+backups/
 
 # Local Claude settings and build artifacts
 .claude/settings.local.json
