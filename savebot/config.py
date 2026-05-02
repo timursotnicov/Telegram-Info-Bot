@@ -29,9 +29,9 @@ class Config:
     app_env: str = os.getenv("APP_ENV", "dev")
     bot_token: str = os.getenv("BOT_TOKEN", "")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    ai_model: str = os.getenv("AI_MODEL", "nousresearch/hermes-3-llama-3.1-405b:free")
+    ai_model: str = os.getenv("AI_MODEL", "google/gemini-2.5-flash-lite")
     ai_fallback_models: list = None  # Set in __post_init__ equivalent below
-    ocr_model: str = os.getenv("OCR_MODEL", "google/gemini-2.0-flash-001")
+    ocr_model: str = os.getenv("OCR_MODEL", "google/gemini-2.5-flash-lite")
     db_path: str = os.getenv("DB_PATH", "savebot.db")
     webhook_host: str = os.getenv("WEBHOOK_HOST", "")
     webhook_path: str = os.getenv("WEBHOOK_PATH", "/webhook")
@@ -48,15 +48,31 @@ def _parse_allowed_users():
         return []
     return [int(u.strip()) for u in users_str.split(",") if u.strip()]
 
+
+def _parse_model_list(value: str) -> list[str]:
+    return [m.strip() for m in value.split(",") if m.strip()]
+
+
+def _unique(items: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for item in items:
+        if item not in seen:
+            result.append(item)
+            seen.add(item)
+    return result
+
+
 config.allowed_users = _parse_allowed_users()
-config.ai_fallback_models = [
+_configured_fallback_models = _parse_model_list(os.getenv("AI_FALLBACK_MODELS", ""))
+config.ai_fallback_models = _unique([
     config.ai_model,
-    "openai/gpt-oss-20b:free",
-    "openrouter/free",
-    "deepseek/deepseek-chat-v3-0324",
-    "deepseek/deepseek-chat",
-    "google/gemini-2.0-flash-001",
-]
+    *(_configured_fallback_models or [
+        "google/gemini-2.5-flash",
+        "openrouter/free",
+        "openai/gpt-oss-20b:free",
+    ]),
+])
 
 def _validate_config():
     """Fail fast with clear error if required env vars are missing."""

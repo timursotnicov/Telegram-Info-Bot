@@ -50,7 +50,7 @@ async def test_classify_content_success():
     """Successful classification returns structured dict."""
     from savebot.services.ai_classifier import classify_content
 
-    resp = _mock_response(200, _ok_json_payload(category="AI", tags=["ml", "llm"]))
+    resp = _mock_response(200, _ok_json_payload(category="Cat", tags=["ml", "llm"]))
     session = _mock_session(resp)
 
     with patch("aiohttp.ClientSession", return_value=session), \
@@ -62,7 +62,7 @@ async def test_classify_content_success():
         result = await classify_content("Some text", [{"name": "Cat", "emoji": "📁"}], ["tag1"])
 
     assert result is not None
-    assert result["category"] == "AI"
+    assert result["category"] == "Cat"
     assert result["tags"] == ["ml", "llm"]
     assert result["emoji"] == "📁"
 
@@ -88,7 +88,7 @@ async def test_classify_content_rate_limit_fallback():
         cfg.ai_model = "model-a"
         cfg.ai_fallback_models = ["model-a", "model-b"]
 
-        result = await classify_content("text", [], [])
+        result = await classify_content("text", [{"name": "Fallback", "emoji": "📁"}], [])
 
     assert result is not None
     assert result["category"] == "Fallback"
@@ -113,7 +113,7 @@ async def test_classify_content_not_found_fallback():
         cfg.ai_model = "model-a"
         cfg.ai_fallback_models = ["model-a", "model-b"]
 
-        result = await classify_content("text", [], [])
+        result = await classify_content("text", [{"name": "Fallback", "emoji": "📁"}], [])
 
     assert result is not None
     assert result["category"] == "Fallback"
@@ -195,6 +195,76 @@ async def test_tag_normalization_hyphens_to_underscores():
 
 
 @pytest.mark.asyncio
+async def test_category_alias_is_mapped_to_existing_category():
+    """English category aliases from the model are mapped to existing Russian categories."""
+    from savebot.services.ai_classifier import classify_content
+
+    payload = _ok_json_payload(category="Investing", tags=["ETF", "Emergency Fund", "money-news"])
+    resp = _mock_response(200, payload)
+    session = _mock_session(resp)
+
+    with patch("aiohttp.ClientSession", return_value=session), \
+         patch("savebot.services.ai_classifier.config") as cfg:
+        cfg.openrouter_api_key = "test-key"
+        cfg.ai_model = "model-a"
+        cfg.ai_fallback_models = ["model-a"]
+
+        result = await classify_content(
+            "ETF portfolio notes",
+            [{"name": "Финансы", "emoji": "💰"}, {"name": "Разное", "emoji": "📥"}],
+            [],
+        )
+
+    assert result["category"] == "Финансы"
+    assert result["tags"] == ["etf", "emergency_fund", "money_news"]
+
+
+@pytest.mark.asyncio
+async def test_category_with_emoji_prefix_is_mapped():
+    """Model output like '💻 Технологии' resolves to the exact existing category."""
+    from savebot.services.ai_classifier import classify_content
+
+    payload = _ok_json_payload(category="💻 Технологии", tags=["AI", "agent-framework"])
+    resp = _mock_response(200, payload)
+    session = _mock_session(resp)
+
+    with patch("aiohttp.ClientSession", return_value=session), \
+         patch("savebot.services.ai_classifier.config") as cfg:
+        cfg.openrouter_api_key = "test-key"
+        cfg.ai_model = "model-a"
+        cfg.ai_fallback_models = ["model-a"]
+
+        result = await classify_content(
+            "AI agent framework for browser automation",
+            [{"name": "Технологии", "emoji": "💻"}, {"name": "Разное", "emoji": "📥"}],
+            [],
+        )
+
+    assert result["category"] == "Технологии"
+    assert result["tags"] == ["ai", "agent_framework"]
+
+
+def test_heuristic_classify_content_routes_common_topics():
+    """Fallback classifier should still route obvious posts when AI is unavailable."""
+    from savebot.services.ai_classifier import heuristic_classify_content
+
+    categories = [
+        {"name": "Технологии", "emoji": "💻"},
+        {"name": "Финансы", "emoji": "💰"},
+        {"name": "Работа", "emoji": "🏢"},
+        {"name": "Разное", "emoji": "📥"},
+    ]
+    result = heuristic_classify_content(
+        "Созвон с подрядчиком завтра, обсудить дедлайн и контракт",
+        categories,
+        [],
+    )
+
+    assert result["category"] == "Работа"
+    assert result["summary"].startswith("Созвон")
+
+
+@pytest.mark.asyncio
 async def test_markdown_code_block_stripping():
     """Response wrapped in ```json ... ``` is still parsed correctly."""
     from savebot.services.ai_classifier import classify_content
@@ -213,7 +283,7 @@ async def test_markdown_code_block_stripping():
         cfg.ai_model = "model-a"
         cfg.ai_fallback_models = ["model-a"]
 
-        result = await classify_content("text", [], [])
+        result = await classify_content("text", [{"name": "Wrapped", "emoji": "📦"}], [])
 
     assert result is not None
     assert result["category"] == "Wrapped"

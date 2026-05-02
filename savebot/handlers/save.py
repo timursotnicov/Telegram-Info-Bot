@@ -9,7 +9,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from savebot.db import queries
 from savebot.db.state_store import get_state, set_state, delete_state
-from savebot.services.ai_classifier import classify_content
+from savebot.services.ai_classifier import classify_content, heuristic_classify_content
 from savebot.services.connections import find_related_items
 from savebot.services.link_preview import extract_url, fetch_link_metadata
 from savebot.services.ocr import extract_text_from_image
@@ -192,13 +192,13 @@ async def _quick_capture(message: types.Message, db) -> bool:
 
 
 async def _classify_with_ai(db, user_id: int, content_text: str) -> dict:
-    """Classify content with AI, fallback to Разное."""
+    """Classify content with AI, fallback to deterministic keyword routing."""
     categories = await queries.get_all_categories(db, user_id)
     tags = await queries.get_all_tags(db, user_id)
     tag_names = [t["tag"] for t in tags]
     ai_result = await classify_content(content_text, categories, tag_names)
     if not ai_result:
-        ai_result = {"category": "Разное", "emoji": "📥", "tags": [], "summary": ""}
+        ai_result = heuristic_classify_content(content_text, categories, tag_names)
     return ai_result
 
 
