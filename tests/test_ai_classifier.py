@@ -95,6 +95,31 @@ async def test_classify_content_rate_limit_fallback():
 
 
 @pytest.mark.asyncio
+async def test_classify_content_not_found_fallback():
+    """404 on a removed model triggers fallback to next model."""
+    from savebot.services.ai_classifier import classify_content
+
+    resp_404 = _mock_response(404, text_data="model not found")
+    session_404 = _mock_session(resp_404)
+
+    resp_ok = _mock_response(200, _ok_json_payload(category="Fallback"))
+    session_ok = _mock_session(resp_ok)
+
+    sessions = iter([session_404, session_ok])
+
+    with patch("aiohttp.ClientSession", side_effect=lambda: next(sessions)), \
+         patch("savebot.services.ai_classifier.config") as cfg:
+        cfg.openrouter_api_key = "test-key"
+        cfg.ai_model = "model-a"
+        cfg.ai_fallback_models = ["model-a", "model-b"]
+
+        result = await classify_content("text", [], [])
+
+    assert result is not None
+    assert result["category"] == "Fallback"
+
+
+@pytest.mark.asyncio
 async def test_classify_content_malformed_json():
     """Malformed JSON response returns None."""
     from savebot.services.ai_classifier import classify_content

@@ -50,7 +50,7 @@ async def extract_text_from_image(bot: Bot, file_id: str) -> str | None:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": config.ai_model,
+        "model": config.ocr_model,
         "messages": [
             {
                 "role": "user",

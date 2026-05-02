@@ -126,8 +126,8 @@ async def classify_content(
                         logger.warning("Model %s returned 400, trying next: %s", model, await resp.text())
                         continue
                     if resp.status != 200:
-                        logger.error("OpenRouter API error: %s %s", resp.status, await resp.text())
-                        return None
+                        logger.warning("Model %s returned %s, trying next: %s", model, resp.status, await resp.text())
+                        continue
                     data = await resp.json()
 
             text = data["choices"][0]["message"]["content"]
@@ -147,8 +147,8 @@ async def classify_content(
             logger.warning("AI classification timeout with model %s, trying next", model)
             continue
         except aiohttp.ClientError as e:
-            logger.error("AI classification network error: %s", e)
-            return None
+            logger.warning("AI classification network error with model %s: %s, trying next", model, e)
+            continue
         except json.JSONDecodeError as e:
             logger.warning("AI classification JSON parse error with model %s: %s, trying next", model, e)
             continue
