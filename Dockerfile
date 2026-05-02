@@ -6,8 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN addgroup --system savebot \
-    && adduser --system --ingroup savebot --home /app savebot
+RUN groupadd --gid 1000 savebot \
+    && useradd --uid 1000 --gid savebot --home-dir /app --shell /usr/sbin/nologin --no-create-home savebot
 
 COPY requirements.txt .
 RUN pip install --upgrade pip \

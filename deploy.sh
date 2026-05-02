@@ -118,6 +118,7 @@ install_entrypoint() {
 prepare_env() {
   log "Preparing production environment"
   mkdir -p "$APP_DIR/data" "$APP_DIR/backups"
+  $SUDO chown -R "$RUN_USER:$RUN_USER" "$APP_DIR/data" "$APP_DIR/backups"
 
   if [ ! -f "$APP_DIR/.env.prod" ]; then
     if [ -f "$APP_DIR/.env.prod.example" ]; then
